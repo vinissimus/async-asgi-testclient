@@ -28,9 +28,17 @@ import async_timeout
 import time
 
 from .compatibility import guarantee_single_callable
-from contextlib import asynccontextmanager
 from json import dumps, loads
-from typing import Any, AnyStr, AsyncGenerator, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import (
+    Any,
+    AnyStr,
+    AsyncGenerator,
+    List,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+    Union,
+)
 from urllib.parse import urlencode
 from multidict import CIMultiDict
 from concurrent.futures import CancelledError
@@ -48,19 +56,43 @@ class TestClient:
 
     def __init__(self, application):
         self.application = guarantee_single_callable(application)
+        self.lifespan_input_queue = asyncio.Queue()
+        self.lifespan_output_queue = asyncio.Queue()
+
+    async def __aenter__(self):
+        asyncio.ensure_future(
+            self.application(
+                {"type": "lifespan", "asgi": {"version": "3.0"}},
+                self.lifespan_input_queue.get,
+                self.lifespan_output_queue.put,
+            )
+        )
+        await self.send_lifespan("startup")
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.send_lifespan("shutdown")
+
+    async def send_lifespan(self, action):
+        await self.lifespan_input_queue.put({"type": f"lifespan.{action}"})
+        message = await self.lifespan_output_queue.get()
+
+        if message["type"] == f"lifespan.{action}.complete":
+            pass
+        elif message["type"] == f"lifespan.{action}.failed":
+            raise Exception(message)
 
     async def open(
-            self,
-            path: str,
-            *,
-            method: str='GET',
-            headers: Optional[Union[dict, CIMultiDict]]=None,
-            data: AnyStr=None,
-            form: Optional[dict]=None,
-            query_string: Optional[dict]=None,
-            json: Any=sentinel,
-            scheme: str='http',
-            follow_redirects: bool=False,
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        headers: Optional[Union[dict, CIMultiDict]] = None,
+        data: AnyStr = None,
+        form: Optional[dict] = None,
+        query_string: Optional[dict] = None,
+        json: Any = sentinel,
+        scheme: str = "http",
     ):
         """Open a request to the app associated with this client.
 
@@ -103,26 +135,28 @@ class TestClient:
         output_queue = asyncio.Queue()
 
         headers, path, query_string_bytes = make_test_headers_path_and_query_string(
-            self.application, path, headers, query_string,
+            self.application, path, headers, query_string
         )
 
         if [json is not sentinel, form is not None, data is not None].count(True) > 1:
-            raise ValueError("Quart test args 'json', 'form', and 'data' are mutually exclusive")
+            raise ValueError(
+                "Quart test args 'json', 'form', and 'data' are mutually exclusive"
+            )
 
-        request_data = b''
+        request_data = b""
 
         if isinstance(data, str):
-            request_data = data.encode('utf-8')
+            request_data = data.encode("utf-8")
         elif isinstance(data, bytes):
             request_data = data
 
         if json is not sentinel:
-            request_data = dumps(json).encode('utf-8')
-            headers['Content-Type'] = 'application/json'
+            request_data = dumps(json).encode("utf-8")
+            headers["Content-Type"] = "application/json"
 
         if form is not None:
-            request_data = urlencode(form).encode('utf-8')
-            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            request_data = urlencode(form).encode("utf-8")
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
 
         scope = {
             "type": "http",
@@ -146,7 +180,7 @@ class TestClient:
 
         status = 0
         raw_headers = []
-        resp = b''
+        resp = b""
 
         while await self._receive_nothing(output_queue) is False:
             message = await self._receive_output(future, output_queue)
@@ -165,7 +199,7 @@ class TestClient:
             [(k.decode("utf8"), v.decode("utf8")) for k, v in raw_headers]
         )
 
-        if headers.get('Content-Type', '') == 'application/json':
+        if headers.get("Content-Type", "") == "application/json":
             resp = loads(resp)
 
         return status, headers, resp
@@ -173,42 +207,42 @@ class TestClient:
     async def delete(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a DELETE request.
         """
-        return await self.open(*args, method='DELETE', **kwargs)
+        return await self.open(*args, method="DELETE", **kwargs)
 
     async def get(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a GET request.
         """
-        return await self.open(*args, method='GET', **kwargs)
+        return await self.open(*args, method="GET", **kwargs)
 
     async def head(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a HEAD request.
         """
-        return await self.open(*args, method='HEAD', **kwargs)
+        return await self.open(*args, method="HEAD", **kwargs)
 
     async def options(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a OPTIONS request.
         """
-        return await self.open(*args, method='OPTIONS', **kwargs)
+        return await self.open(*args, method="OPTIONS", **kwargs)
 
     async def patch(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a PATCH request.
         """
-        return await self.open(*args, method='PATCH', **kwargs)
+        return await self.open(*args, method="PATCH", **kwargs)
 
     async def post(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a POST request.
         """
-        return await self.open(*args, method='POST', **kwargs)
+        return await self.open(*args, method="POST", **kwargs)
 
     async def put(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a PUT request.
         """
-        return await self.open(*args, method='PUT', **kwargs)
+        return await self.open(*args, method="PUT", **kwargs)
 
     async def trace(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a TRACE request.
         """
-        return await self.open(*args, method='TRACE', **kwargs)
+        return await self.open(*args, method="TRACE", **kwargs)
 
     async def _receive_output(self, future, output_queue, timeout=1):
         """
@@ -247,10 +281,10 @@ class TestClient:
 
 
 def make_test_headers_path_and_query_string(
-        app: 'Quart',
-        path: str,
-        headers: Optional[Union[dict, CIMultiDict]]=None,
-        query_string: Optional[dict]=None,
+    app: "Quart",
+    path: str,
+    headers: Optional[Union[dict, CIMultiDict]] = None,
+    query_string: Optional[dict] = None,
 ) -> Tuple[CIMultiDict, str, bytes]:
     """Make the headers and path with defaults for testing.
 
@@ -269,19 +303,16 @@ def make_test_headers_path_and_query_string(
         headers = headers
     elif headers is not None:
         headers = CIMultiDict(headers)
-    headers.setdefault('Remote-Addr', '127.0.0.1')
-    headers.setdefault('User-Agent', 'Quart')
-    headers.setdefault('host', 'localhost')
-    headers = [
-        (bytes(k, 'utf8'), bytes(v, 'utf8'))
-        for k, v in headers.items()
-    ]
+    headers.setdefault("Remote-Addr", "127.0.0.1")
+    headers.setdefault("User-Agent", "Quart")
+    headers.setdefault("host", "localhost")
+    headers = [(bytes(k, "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
 
-    if '?' in path and query_string is not None:
-        raise ValueError('Query string is defined in the path and as an argument')
+    if "?" in path and query_string is not None:
+        raise ValueError("Query string is defined in the path and as an argument")
     if query_string is None:
-        path, _, query_string_raw = path.partition('?')
+        path, _, query_string_raw = path.partition("?")
     else:
         query_string_raw = urlencode(query_string, doseq=True)
-    query_string_bytes = query_string_raw.encode('ascii')
+    query_string_bytes = query_string_raw.encode("ascii")
     return headers, path, query_string_bytes
