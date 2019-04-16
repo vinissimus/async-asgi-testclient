@@ -1,4 +1,4 @@
-from asgi_testclient import TestClient
+from async_asgi_testclient import TestClient
 
 import pytest
 
