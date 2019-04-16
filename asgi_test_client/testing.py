@@ -41,6 +41,7 @@ from typing import (
     Union,
 )
 from urllib.parse import urlencode
+from http.cookies import SimpleCookie
 from multidict import CIMultiDict
 from requests.models import Response
 from concurrent.futures import CancelledError
@@ -57,6 +58,7 @@ class TestClient:
 
     def __init__(self, application):
         self.application = guarantee_single_callable(application)
+        self.cookie_jar = SimpleCookie()
         self.lifespan_input_queue = asyncio.Queue()
         self.lifespan_output_queue = asyncio.Queue()
 
@@ -155,8 +157,11 @@ class TestClient:
             request_data = urlencode(form).encode("utf-8")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
 
+        if self.cookie_jar.output():
+            headers.add('Cookie', self.cookie_jar.output(header=''))
+
         # Convert dict to list of tuples
-        headers = [(bytes(k, "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
+        headers = [(bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
 
         scope = {
             "type": "http",
@@ -197,6 +202,7 @@ class TestClient:
             else:
                 raise Exception(message)
 
+        self.cookie_jar.load(response.headers.get('Set-Cookie', ''))
         response.raw.seek(0)
         return response
 

@@ -5,7 +5,7 @@ import pytest
 
 @pytest.fixture
 def quart_app():
-    from quart import Quart, jsonify, request
+    from quart import Quart, jsonify, request, Response
 
     app = Quart(__name__)
 
@@ -35,6 +35,17 @@ def quart_app():
         if app.custom_init_complete:
             return b"yes"
         return b"no"
+
+    @app.route("/cookie", methods=["POST"])
+    async def set_cookie():
+        r = Response("")
+        r.set_cookie(key="my-cookie", value="1234")
+        return r
+
+    @app.route("/cookie")
+    async def get_cookie():
+        cookies = request.cookies
+        return jsonify(cookies)
 
     yield app
 
@@ -73,6 +84,17 @@ def starlette_app():
             return Response("yes")
         return Response("no")
 
+    @app.route("/cookie", methods=["POST"])
+    async def set_cookie(request):
+        r = Response("")
+        r.set_cookie("my-cookie", "1234")
+        return r
+
+    @app.route("/cookie")
+    async def get_cookie(request):
+        cookies = request.cookies
+        return JSONResponse(cookies)
+
     yield app
 
 
@@ -99,6 +121,13 @@ async def test_Quart_TestClient(quart_app):
         assert resp.status_code == 200
         assert resp.text == "yes"
 
+        resp = await client.post("/cookie")  # responds with 'set-cookie: my-cookie=1234'
+        assert resp.status_code == 200
+
+        resp = await client.get("/cookie")
+        assert resp.status_code == 200
+        assert resp.json() == {"my-cookie": "1234"}
+
 
 @pytest.mark.asyncio
 async def test_Starlette_TestClient(starlette_app):
@@ -116,9 +145,16 @@ async def test_Starlette_TestClient(starlette_app):
         assert resp.headers["X-Header"] == "Value"
         assert resp.text == ""
 
-        # resp = await client.post("/form", form=[("user", "root"), ("pswd", 1234)])
-        # assert resp.json() == {"pswd": "1234", "user": "root"}
+        resp = await client.post("/form", form=[("user", "root"), ("pswd", 1234)])
+        assert resp.json() == {"pswd": "1234", "user": "root"}
 
         resp = await client.get("/check_startup_works")
         assert resp.status_code == 200
         assert resp.text == "yes"
+
+        resp = await client.post("/cookie")  # responds with 'set-cookie: my-cookie=1234'
+        assert resp.status_code == 200
+
+        resp = await client.get("/cookie")
+        assert resp.status_code == 200
+        assert resp.json() == {"my-cookie": "1234"}
