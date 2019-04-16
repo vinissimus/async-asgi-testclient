@@ -1,4 +1,4 @@
-from asgi_test_client import TestClient
+from asgi_testclient import TestClient
 
 import pytest
 
@@ -121,8 +121,11 @@ async def test_Quart_TestClient(quart_app):
         assert resp.status_code == 200
         assert resp.text == "yes"
 
-        resp = await client.post("/cookie")  # responds with 'set-cookie: my-cookie=1234'
+        resp = await client.post(
+            "/cookie"
+        )  # responds with 'set-cookie: my-cookie=1234'
         assert resp.status_code == 200
+        assert resp.cookies == {"my-cookie": "1234"}
 
         resp = await client.get("/cookie")
         assert resp.status_code == 200
@@ -152,7 +155,9 @@ async def test_Starlette_TestClient(starlette_app):
         assert resp.status_code == 200
         assert resp.text == "yes"
 
-        resp = await client.post("/cookie")  # responds with 'set-cookie: my-cookie=1234'
+        resp = await client.post(
+            "/cookie"
+        )  # responds with 'set-cookie: my-cookie=1234'
         assert resp.status_code == 200
 
         resp = await client.get("/cookie")

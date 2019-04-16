@@ -27,19 +27,11 @@ import asyncio
 import async_timeout
 import io
 import time
+import requests
 
 from .compatibility import guarantee_single_callable
-from json import dumps, loads
-from typing import (
-    Any,
-    AnyStr,
-    AsyncGenerator,
-    List,
-    Optional,
-    Tuple,
-    TYPE_CHECKING,
-    Union,
-)
+from json import dumps
+from typing import Any, AnyStr, Optional, Tuple, Union
 from urllib.parse import urlencode
 from http.cookies import SimpleCookie
 from multidict import CIMultiDict
@@ -158,10 +150,12 @@ class TestClient:
             headers["Content-Type"] = "application/x-www-form-urlencoded"
 
         if self.cookie_jar.output():
-            headers.add('Cookie', self.cookie_jar.output(header=''))
+            headers.add("Cookie", self.cookie_jar.output(header=""))
 
         # Convert dict to list of tuples
-        headers = [(bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
+        headers = [
+            (bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()
+        ]
 
         scope = {
             "type": "http",
@@ -202,7 +196,10 @@ class TestClient:
             else:
                 raise Exception(message)
 
-        self.cookie_jar.load(response.headers.get('Set-Cookie', ''))
+        self.cookie_jar.load(response.headers.get("Set-Cookie", ""))
+        response.cookies = requests.cookies.RequestsCookieJar()
+        response.cookies.update(self.cookie_jar)
+
         response.raw.seek(0)
         return response
 

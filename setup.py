@@ -5,31 +5,38 @@
 
 from setuptools import setup, find_packages
 
+with open("README.md", "r") as f:
+    readme = f.read()
+
+with open("requirements.txt", "r") as f:
+    requirements = f.readlines()
+
+with open("test-requirements.txt", "r") as f:
+    test_requirements = f.readlines()
 
 setup(
     author="Jordi Masip",
-    author_email='jordi@masip.cat',
+    author_email="jordi@masip.cat",
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License',
-        'Natural Language :: English',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
+        "Development Status :: 2 - Pre-Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Natural Language :: English",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
     ],
-    description="Small and partial Obejct mapper on top of sqlalchemy for async",
-    # install_requires=requirements,
+    description="Async client for testing ASGI web servers",
+    install_requires=requirements,
     license="GNU license",
-    # long_description=readme + '\n\n' + history,
-    # long_description_content_type="text/markdown",
+    long_description=readme,
+    long_description_content_type="text/markdown",
     include_package_data=True,
-    keywords='asgi_test_client',
-    name='asgi_test_client',
-    packages=find_packages(include=['asgi_test_client']),
-    # setup_requires=setup_requirements,
-    test_suite='tests',
-    # tests_require=test_requirements,
-    url='https://github.com/vinissimus/asgi-test-client',
-    # version=version,
+    name="asgi-testclient",
+    keywords="asgi testclient",
+    packages=find_packages(include=["asgi_testclient"]),
+    test_suite="tests",
+    tests_require=test_requirements,
+    url="https://github.com/vinissimus/asgi-testclient",
+    version="0.1",
     zip_safe=False,
 )
