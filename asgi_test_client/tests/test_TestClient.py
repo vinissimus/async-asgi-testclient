@@ -5,12 +5,12 @@ import pytest
 
 @pytest.fixture
 def quart_app():
-    from quart import Quart, jsonify
+    from quart import Quart, jsonify, request
 
     app = Quart(__name__)
 
     @app.before_serving
-    async def open_database_connection_pool():
+    async def startup():
         app.custom_init_complete = True
 
     @app.route("/")
@@ -25,8 +25,13 @@ def quart_app():
     async def headers():
         return b"", 204, {"X-Header": "Value"}
 
-    @app.route("/before_serving_works")
-    async def before_serving_works():
+    @app.route("/form", methods=["POST"])
+    async def form():
+        form = await request.form
+        return jsonify(dict(form))
+
+    @app.route("/check_startup_works")
+    async def check_startup_works():
         if app.custom_init_complete:
             return b"yes"
         return b"no"
@@ -42,7 +47,7 @@ def starlette_app():
     app = Starlette()
 
     @app.on_event("startup")
-    async def open_database_connection_pool():
+    async def startup():
         app.custom_init_complete = True
 
     @app.route("/")
@@ -57,8 +62,13 @@ def starlette_app():
     async def headers(request):
         return Response(status_code=204, headers={"X-Header": "Value"})
 
-    @app.route("/before_serving_works")
-    async def before_serving_works(request):
+    @app.route("/form", methods=["POST"])
+    async def form(request):
+        form = await request.form()
+        return JSONResponse(form._dict)
+
+    @app.route("/check_startup_works")
+    async def check_startup_works(request):
         if app.custom_init_complete:
             return Response("yes")
         return Response("no")
@@ -69,40 +79,46 @@ def starlette_app():
 @pytest.mark.asyncio
 async def test_Quart_TestClient(quart_app):
     async with TestClient(quart_app) as client:
-        status, _, resp = await client.get("/")
-        assert status == 200
-        assert resp == b"full response"
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert resp.text == "full response"
 
-        status, _, resp = await client.get("/json")
-        assert status == 200
-        assert resp == {"hello": "world"}
+        resp = await client.get("/json")
+        assert resp.status_code == 200
+        assert resp.json() == {"hello": "world"}
 
-        status, headers, resp = await client.get("/header")
-        assert status == 204
-        assert headers["X-Header"] == "Value"
-        assert resp == b""
+        resp = await client.get("/header")
+        assert resp.status_code == 204
+        assert resp.headers["X-Header"] == "Value"
+        assert resp.text == ""
 
-        status, _, resp = await client.get("/before_serving_works")
-        assert status == 200
-        assert resp == b"yes"
+        resp = await client.post("/form", form=[("user", "root"), ("pswd", 1234)])
+        assert resp.json() == {"pswd": "1234", "user": "root"}
+
+        resp = await client.get("/check_startup_works")
+        assert resp.status_code == 200
+        assert resp.text == "yes"
 
 
 @pytest.mark.asyncio
 async def test_Starlette_TestClient(starlette_app):
     async with TestClient(starlette_app) as client:
-        status, _, resp = await client.get("/")
-        assert status == 200
-        assert resp == b"full response"
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert resp.text == "full response"
 
-        status, _, resp = await client.get("/json")
-        assert status == 200
-        assert resp == {"hello": "world"}
+        resp = await client.get("/json")
+        assert resp.status_code == 200
+        assert resp.json() == {"hello": "world"}
 
-        status, headers, resp = await client.get("/header")
-        assert status == 204
-        assert headers["X-Header"] == "Value"
-        assert resp == b""
+        resp = await client.get("/header")
+        assert resp.status_code == 204
+        assert resp.headers["X-Header"] == "Value"
+        assert resp.text == ""
 
-        status, _, resp = await client.get("/before_serving_works")
-        assert status == 200
-        assert resp == b"yes"
+        # resp = await client.post("/form", form=[("user", "root"), ("pswd", 1234)])
+        # assert resp.json() == {"pswd": "1234", "user": "root"}
+
+        resp = await client.get("/check_startup_works")
+        assert resp.status_code == 200
+        assert resp.text == "yes"

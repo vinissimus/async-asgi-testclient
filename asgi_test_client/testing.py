@@ -25,6 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
 import async_timeout
+import io
 import time
 
 from .compatibility import guarantee_single_callable
@@ -41,8 +42,8 @@ from typing import (
 )
 from urllib.parse import urlencode
 from multidict import CIMultiDict
+from requests.models import Response
 from concurrent.futures import CancelledError
-
 
 sentinel = object()
 
@@ -124,10 +125,6 @@ class TestClient:
             scheme
                 The scheme to use in the request, default http.
 
-            follow_redirects
-                Whether or not a redirect response should be followed, defaults
-                to False.
-
         Returns:
             The response from the app handling the request.
         """
@@ -140,7 +137,7 @@ class TestClient:
 
         if [json is not sentinel, form is not None, data is not None].count(True) > 1:
             raise ValueError(
-                "Quart test args 'json', 'form', and 'data' are mutually exclusive"
+                "Test args 'json', 'form', and 'data' are mutually exclusive"
             )
 
         request_data = b""
@@ -158,6 +155,9 @@ class TestClient:
             request_data = urlencode(form).encode("utf-8")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
 
+        # Convert dict to list of tuples
+        headers = [(bytes(k, "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
+
         scope = {
             "type": "http",
             "http_version": "1.1",
@@ -166,10 +166,8 @@ class TestClient:
             "scheme": scheme,
             "path": path,
             "query_string": query_string_bytes,
-            "root_path": "",  # TODO
+            "root_path": "",
             "headers": headers,
-            "client": (None, None),  # TODO
-            "server": (None, None),  # TODO
         }
 
         future = asyncio.ensure_future(
@@ -178,31 +176,29 @@ class TestClient:
 
         await input_queue.put({"type": "http.request", "body": request_data})
 
-        status = 0
-        raw_headers = []
-        resp = b""
+        response = Response()
+        response.raw = io.BytesIO()
 
         while await self._receive_nothing(output_queue) is False:
             message = await self._receive_output(future, output_queue)
             if message["type"] == "http.response.start":
-                status = message["status"]
-                raw_headers = message["headers"]
+                response.status_code = message["status"]
+                response.headers = CIMultiDict(
+                    [
+                        (k.decode("utf8"), v.decode("utf8"))
+                        for k, v in message["headers"]
+                    ]
+                )
             elif message["type"] == "http.response.body":
-                resp += bytes(message["body"])
+                response.raw.write(bytes(message["body"]))
                 if not message.get("more_body", False):
                     await input_queue.put({"type": "http.disconnect"})
                     break
             else:
                 raise Exception(message)
 
-        headers = CIMultiDict(
-            [(k.decode("utf8"), v.decode("utf8")) for k, v in raw_headers]
-        )
-
-        if headers.get("Content-Type", "") == "application/json":
-            resp = loads(resp)
-
-        return status, headers, resp
+        response.raw.seek(0)
+        return response
 
     async def delete(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a DELETE request.
@@ -281,7 +277,7 @@ class TestClient:
 
 
 def make_test_headers_path_and_query_string(
-    app: "Quart",
+    app: Any,
     path: str,
     headers: Optional[Union[dict, CIMultiDict]] = None,
     query_string: Optional[dict] = None,
@@ -304,9 +300,8 @@ def make_test_headers_path_and_query_string(
     elif headers is not None:
         headers = CIMultiDict(headers)
     headers.setdefault("Remote-Addr", "127.0.0.1")
-    headers.setdefault("User-Agent", "Quart")
+    headers.setdefault("User-Agent", "ASGI-Test-Client")
     headers.setdefault("host", "localhost")
-    headers = [(bytes(k, "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
 
     if "?" in path and query_string is not None:
         raise ValueError("Query string is defined in the path and as an argument")
