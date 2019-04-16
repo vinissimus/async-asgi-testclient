@@ -4,7 +4,7 @@ ASGI TestClient is a library for testing web applications that implements ASGI s
 
 The motivation behind this project is building a common testing library that doesn't deppend on the web framework ([Quart](https://gitlab.com/pgjones/quart), [Startlette](https://github.com/encode/starlette), ...), the same way people are doing ASGI servers like [uvicorn](https://www.uvicorn.org/) or [hypercorn](https://gitlab.com/pgjones/quart) that doesn't deppend on the framework.
 
-This library is based on the testing module in [Quart](https://gitlab.com/pgjones/quart).
+This library is based on the testing module provided in [Quart](https://gitlab.com/pgjones/quart).
 
 ## Quickstart
 
@@ -26,7 +26,7 @@ app = Quart(__name__)
 
 @app.route("/")
 async def root():
-    return b"full response"
+    return "plain response"
 
 @app.route("/json")
 async def json():
@@ -48,7 +48,7 @@ async def test_quart_app():
     async with TestClient() as client:
         resp = await client.get("/")
         assert resp.status_code == 200
-        assert resp.text == "full response"
+        assert resp.text == "plain response"
 
         resp = await client.get("/json")
         assert resp.status_code == 200

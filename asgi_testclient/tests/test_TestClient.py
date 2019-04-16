@@ -15,7 +15,7 @@ def quart_app():
 
     @app.route("/")
     async def root():
-        return b"full response"
+        return "full response"
 
     @app.route("/json")
     async def json():
@@ -23,7 +23,7 @@ def quart_app():
 
     @app.route("/header")
     async def headers():
-        return b"", 204, {"X-Header": "Value"}
+        return "", 204, {"X-Header": "Value"}
 
     @app.route("/form", methods=["POST"])
     async def form():
@@ -33,8 +33,8 @@ def quart_app():
     @app.route("/check_startup_works")
     async def check_startup_works():
         if app.custom_init_complete:
-            return b"yes"
-        return b"no"
+            return "yes"
+        return "no"
 
     @app.route("/cookie", methods=["POST"])
     async def set_cookie():
