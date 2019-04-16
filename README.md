@@ -2,7 +2,7 @@
 
 Async ASGI TestClient is a library for testing web applications that implements ASGI specification (version 2 and 3).
 
-The motivation behind this project is building a common testing library that doesn't deppend on the web framework ([Quart](https://gitlab.com/pgjones/quart), [Startlette](https://github.com/encode/starlette), ...), the same way people are doing ASGI servers like [uvicorn](https://www.uvicorn.org/) or [hypercorn](https://gitlab.com/pgjones/quart) that doesn't deppend on the framework.
+The motivation behind this project is building a common testing library that doesn't depend on the web framework ([Quart](https://gitlab.com/pgjones/quart), [Startlette](https://github.com/encode/starlette), ...), the same way people are doing ASGI servers like [uvicorn](https://www.uvicorn.org/) or [hypercorn](https://gitlab.com/pgjones/quart) that doesn't depend on the framework.
 
 This library is based on the testing module provided in [Quart](https://gitlab.com/pgjones/quart).
 
@@ -54,3 +54,10 @@ async def test_quart_app():
         assert resp.status_code == 200
         assert resp.json() == {"hello": "world"}
 ```
+
+## TODO
+
+ - [ ] follow redirects
+ - [ ] request / response streams
+ - [ ] websocket support
+ - [ ] add more tests
