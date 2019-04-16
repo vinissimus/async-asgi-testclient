@@ -1,6 +1,6 @@
-# asgi-testclient
+# async-asgi-testclient
 
-ASGI TestClient is a library for testing web applications that implements ASGI specification (version 2 and 3).
+Async ASGI TestClient is a library for testing web applications that implements ASGI specification (version 2 and 3).
 
 The motivation behind this project is building a common testing library that doesn't deppend on the web framework ([Quart](https://gitlab.com/pgjones/quart), [Startlette](https://github.com/encode/starlette), ...), the same way people are doing ASGI servers like [uvicorn](https://www.uvicorn.org/) or [hypercorn](https://gitlab.com/pgjones/quart) that doesn't deppend on the framework.
 
@@ -13,7 +13,7 @@ Requirements: Python 3.6+
 Installation:
 
 ```bash
-pip install asgi-testclient
+pip install async-asgi-testclient
 ```
 
 ## Usage
