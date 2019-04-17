@@ -49,7 +49,7 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(self, application, raise_server_exceptions=True):
+    def __init__(self, application, raise_server_exceptions=False):
         self.application = guarantee_single_callable(application)
         self.cookie_jar = SimpleCookie()
         self.lifespan_input_queue = asyncio.Queue()
