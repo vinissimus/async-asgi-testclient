@@ -28,6 +28,7 @@ import async_timeout
 import io
 import time
 import requests
+import traceback
 
 from .compatibility import guarantee_single_callable
 from json import dumps
@@ -48,11 +49,12 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(self, application):
+    def __init__(self, application, raise_server_exceptions=True):
         self.application = guarantee_single_callable(application)
         self.cookie_jar = SimpleCookie()
         self.lifespan_input_queue = asyncio.Queue()
         self.lifespan_output_queue = asyncio.Queue()
+        self.raise_server_exceptions = raise_server_exceptions
 
     async def __aenter__(self):
         asyncio.ensure_future(
@@ -179,7 +181,19 @@ class TestClient:
         response.raw = io.BytesIO()
 
         while await self._receive_nothing(output_queue) is False:
-            message = await self._receive_output(future, output_queue)
+            try:
+                message = await self._receive_output(future, output_queue)
+            except Exception as exc:
+                if not self.raise_server_exceptions:
+                    response.status_code = 500
+                    response.raw.write(bytes(
+                        "".join(traceback.format_tb(exc.__traceback__)),
+                        encoding='utf-8'
+                    ))
+                    await input_queue.put({"type": "http.disconnect"})
+                    break
+                raise exc from None
+
             if message["type"] == "http.response.start":
                 response.status_code = message["status"]
                 response.headers = CIMultiDict(
