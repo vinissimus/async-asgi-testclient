@@ -163,3 +163,27 @@ async def test_Starlette_TestClient(starlette_app):
         resp = await client.get("/cookie")
         assert resp.status_code == 200
         assert resp.json() == {"my-cookie": "1234"}
+
+
+@pytest.mark.asyncio
+async def test_exception_capture(starlette_app):
+    async def view_raiser(request):
+        assert 1 == 0
+
+    starlette_app.add_route("/raiser", view_raiser)
+
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/raiser")
+        assert resp.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_exception_capture_release(starlette_app):
+    async def view_raiser(request):
+        assert 1 == 0
+
+    starlette_app.add_route("/raiser", view_raiser)
+
+    async with TestClient(starlette_app, raise_server_exceptions=True) as client:
+        with pytest.raises(AssertionError):
+            resp = await client.get("/raiser")
