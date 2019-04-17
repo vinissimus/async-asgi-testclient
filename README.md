@@ -1,5 +1,7 @@
 # async-asgi-testclient
 
+[![Build Status](https://travis-ci.com/vinissimus/async-asgi-testclient.svg?branch=master)](https://travis-ci.com/vinissimus/async-asgi-testclient) [![PyPI version](https://badge.fury.io/py/async-asgi-testclient.svg)](https://badge.fury.io/py/async-asgi-testclient)
+
 Async ASGI TestClient is a library for testing web applications that implements ASGI specification (version 2 and 3).
 
 The motivation behind this project is building a common testing library that doesn't depend on the web framework ([Quart](https://gitlab.com/pgjones/quart), [Startlette](https://github.com/encode/starlette), ...), the same way people are doing ASGI servers like [uvicorn](https://www.uvicorn.org/) or [hypercorn](https://gitlab.com/pgjones/quart) that doesn't depend on the framework.
