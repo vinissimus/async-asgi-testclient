@@ -186,10 +186,12 @@ class TestClient:
             except Exception as exc:
                 if not self.raise_server_exceptions:
                     response.status_code = 500
-                    response.raw.write(bytes(
-                        "".join(traceback.format_tb(exc.__traceback__)),
-                        encoding='utf-8'
-                    ))
+                    response.raw.write(
+                        bytes(
+                            "".join(traceback.format_tb(exc.__traceback__)),
+                            encoding="utf-8",
+                        )
+                    )
                     await input_queue.put({"type": "http.disconnect"})
                     break
                 raise exc from None
