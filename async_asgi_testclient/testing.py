@@ -58,8 +58,8 @@ class TestClient:
         self.application = guarantee_single_callable(application)
         self.raise_server_exceptions = raise_server_exceptions
         self.cookie_jar = SimpleCookie() if use_cookies else None
-        self._lifespan_input_queue = asyncio.Queue()
-        self._lifespan_output_queue = asyncio.Queue()
+        self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
 
     async def __aenter__(self):
         asyncio.ensure_future(
