@@ -1,0 +1,3 @@
+[run]
+omit =
+    async_asgi_testclient/tests/*
