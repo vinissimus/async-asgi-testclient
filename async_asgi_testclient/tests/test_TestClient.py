@@ -36,7 +36,7 @@ def quart_app():
             return "yes"
         return "no"
 
-    @app.route("/cookie", methods=["POST"])
+    @app.route("/set_cookie", methods=["POST"])
     async def set_cookie():
         r = Response("")
         r.set_cookie(key="my-cookie", value="1234")
@@ -84,7 +84,7 @@ def starlette_app():
             return Response("yes")
         return Response("no")
 
-    @app.route("/cookie", methods=["POST"])
+    @app.route("/set_cookie", methods=["POST"])
     async def set_cookie(request):
         r = Response("")
         r.set_cookie("my-cookie", "1234")
@@ -122,7 +122,7 @@ async def test_Quart_TestClient(quart_app):
         assert resp.text == "yes"
 
         resp = await client.post(
-            "/cookie"
+            "/set_cookie"
         )  # responds with 'set-cookie: my-cookie=1234'
         assert resp.status_code == 200
         assert resp.cookies == {"my-cookie": "1234"}
@@ -156,13 +156,44 @@ async def test_Starlette_TestClient(starlette_app):
         assert resp.text == "yes"
 
         resp = await client.post(
-            "/cookie"
+            "/set_cookie"
         )  # responds with 'set-cookie: my-cookie=1234'
         assert resp.status_code == 200
 
         resp = await client.get("/cookie")
         assert resp.status_code == 200
         assert resp.json() == {"my-cookie": "1234"}
+
+
+@pytest.mark.asyncio
+async def test_set_cookie_in_request(quart_app):
+    async with TestClient(quart_app) as client:
+        resp = await client.post(
+            "/set_cookie"
+        )  # responds with 'set-cookie: my-cookie=1234'
+        assert resp.status_code == 200
+        assert resp.cookies == {"my-cookie": "1234"}
+
+        # Uses 'custom_cookie_jar' instead of 'client.cookie_jar'
+        custom_cookie_jar = {"my-cookie": "6666"}
+        resp = await client.get("/cookie", cookies=custom_cookie_jar)
+        assert resp.status_code == 200
+        assert resp.json() == custom_cookie_jar
+
+        # Uses 'client.cookie_jar' again
+        resp = await client.get("/cookie")
+        assert resp.status_code == 200
+        assert resp.json() == {"my-cookie": "1234"}
+
+
+@pytest.mark.asyncio
+async def test_disable_cookies_in_client(quart_app):
+    async with TestClient(quart_app, use_cookies=False) as client:
+        resp = await client.post(
+            "/set_cookie"
+        )  # responds with 'set-cookie: my-cookie=1234' but cookies are disabled
+        assert resp.status_code == 200
+        assert resp.cookies == {}
 
 
 @pytest.mark.asyncio

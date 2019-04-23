@@ -32,7 +32,7 @@ import traceback
 
 from .compatibility import guarantee_single_callable
 from json import dumps
-from typing import Any, AnyStr, Optional, Tuple, Union
+from typing import Any, AnyStr, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 from http.cookies import SimpleCookie
 from multidict import CIMultiDict
@@ -49,19 +49,24 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(self, application, raise_server_exceptions=False):
+    def __init__(
+        self,
+        application,
+        raise_server_exceptions: bool = False,
+        use_cookies: bool = True,
+    ):
         self.application = guarantee_single_callable(application)
-        self.cookie_jar = SimpleCookie()
-        self.lifespan_input_queue = asyncio.Queue()
-        self.lifespan_output_queue = asyncio.Queue()
         self.raise_server_exceptions = raise_server_exceptions
+        self.cookie_jar = SimpleCookie() if use_cookies else None
+        self._lifespan_input_queue = asyncio.Queue()
+        self._lifespan_output_queue = asyncio.Queue()
 
     async def __aenter__(self):
         asyncio.ensure_future(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
-                self.lifespan_input_queue.get,
-                self.lifespan_output_queue.put,
+                self._lifespan_input_queue.get,
+                self._lifespan_output_queue.put,
             )
         )
         await self.send_lifespan("startup")
@@ -71,8 +76,8 @@ class TestClient:
         await self.send_lifespan("shutdown")
 
     async def send_lifespan(self, action):
-        await self.lifespan_input_queue.put({"type": f"lifespan.{action}"})
-        message = await self.lifespan_output_queue.get()
+        await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
+        message = await self._lifespan_output_queue.get()
 
         if message["type"] == f"lifespan.{action}.complete":
             pass
@@ -90,6 +95,7 @@ class TestClient:
         query_string: Optional[dict] = None,
         json: Any = sentinel,
         scheme: str = "http",
+        cookies: Optional[dict] = None,
     ):
         """Open a request to the app associated with this client.
 
@@ -124,8 +130,8 @@ class TestClient:
         Returns:
             The response from the app handling the request.
         """
-        input_queue = asyncio.Queue()
-        output_queue = asyncio.Queue()
+        input_queue: asyncio.Queue[dict] = asyncio.Queue()
+        output_queue: asyncio.Queue[dict] = asyncio.Queue()
 
         headers, path, query_string_bytes = make_test_headers_path_and_query_string(
             self.application, path, headers, query_string
@@ -151,11 +157,15 @@ class TestClient:
             request_data = urlencode(form).encode("utf-8")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-        if self.cookie_jar.output():
-            headers.add("Cookie", self.cookie_jar.output(header=""))
+        if cookies is None:  # use cookie_jar from TestClient
+            cookie_jar = self.cookie_jar
+        else:
+            cookie_jar = SimpleCookie(cookies)
 
-        # Convert dict to list of tuples
-        headers = [
+        if cookie_jar and cookie_jar.output(header=""):
+            headers.add("Cookie", cookie_jar.output(header=""))
+
+        flat_headers: List[Tuple] = [
             (bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()
         ]
 
@@ -168,7 +178,7 @@ class TestClient:
             "path": path,
             "query_string": query_string_bytes,
             "root_path": "",
-            "headers": headers,
+            "headers": flat_headers,
         }
 
         future = asyncio.ensure_future(
@@ -212,9 +222,10 @@ class TestClient:
             else:
                 raise Exception(message)
 
-        self.cookie_jar.load(response.headers.get("Set-Cookie", ""))
-        response.cookies = requests.cookies.RequestsCookieJar()
-        response.cookies.update(self.cookie_jar)
+        if cookie_jar is not None:
+            cookie_jar.load(response.headers.get("Set-Cookie", ""))
+            response.cookies = requests.cookies.RequestsCookieJar()
+            response.cookies.update(cookie_jar)
 
         response.raw.seek(0)
         return response

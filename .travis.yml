@@ -8,4 +8,4 @@ install:
   - pip install -r test-requirements.txt
 # command to run tests
 script:
-  - pytest async_asgi_testclient -v
+  - pytest --cov=async_asgi_testclient async_asgi_testclient -v
