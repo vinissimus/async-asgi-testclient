@@ -217,4 +217,4 @@ async def test_exception_capture_release(starlette_app):
 
     async with TestClient(starlette_app, raise_server_exceptions=True) as client:
         with pytest.raises(AssertionError):
-            resp = await client.get("/raiser")
+            await client.get("/raiser")

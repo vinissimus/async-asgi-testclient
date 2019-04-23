@@ -127,6 +127,10 @@ class TestClient:
             scheme
                 The scheme to use in the request, default http.
 
+            cookies
+                Cookies to send in the request instead of cookies in
+                TestClient.cookie_jar
+
         Returns:
             The response from the app handling the request.
         """
@@ -157,7 +161,7 @@ class TestClient:
             request_data = urlencode(form).encode("utf-8")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-        if cookies is None:  # use cookie_jar from TestClient
+        if cookies is None:  # use TestClient.cookie_jar
             cookie_jar = self.cookie_jar
         else:
             cookie_jar = SimpleCookie(cookies)
