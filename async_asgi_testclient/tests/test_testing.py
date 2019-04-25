@@ -1,11 +1,12 @@
 from async_asgi_testclient import TestClient
 
+import asyncio
 import pytest
 
 
 @pytest.fixture
 def quart_app():
-    from quart import Quart, jsonify, request, Response
+    from quart import Quart, jsonify, request, redirect, Response
 
     app = Quart(__name__)
 
@@ -46,6 +47,27 @@ def quart_app():
     async def get_cookie():
         cookies = request.cookies
         return jsonify(cookies)
+
+    @app.route("/stuck")
+    async def stuck():
+        await asyncio.sleep(60)
+
+    @app.route("/error")
+    async def error():
+        raise Exception("Error!")
+
+    @app.route("/download_stream")
+    async def down_stream():
+        async def async_generator():
+            chunk = b"X" * 1024
+            for _ in range(3):
+                yield chunk
+
+        return async_generator()
+
+    @app.route("/redir")
+    async def redir():
+        return redirect(request.args["path"])
 
     yield app
 
@@ -95,11 +117,15 @@ def starlette_app():
         cookies = request.cookies
         return JSONResponse(cookies)
 
+    @app.route("/stuck")
+    async def stuck(request):
+        await asyncio.sleep(60)
+
     yield app
 
 
 @pytest.mark.asyncio
-async def test_Quart_TestClient(quart_app):
+async def test_TestClient_Quart(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.get("/")
         assert resp.status_code == 200
@@ -133,7 +159,7 @@ async def test_Quart_TestClient(quart_app):
 
 
 @pytest.mark.asyncio
-async def test_Starlette_TestClient(starlette_app):
+async def test_TestClient_Starlette(starlette_app):
     async with TestClient(starlette_app) as client:
         resp = await client.get("/")
         assert resp.status_code == 200
@@ -218,3 +244,54 @@ async def test_exception_capture_release(starlette_app):
     async with TestClient(starlette_app, raise_server_exceptions=True) as client:
         with pytest.raises(AssertionError):
             await client.get("/raiser")
+
+
+@pytest.mark.asyncio
+async def test_quart_endpoint_not_responding(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        with pytest.raises(asyncio.TimeoutError):
+            await client.get("/stuck")
+
+
+@pytest.mark.asyncio
+async def test_startlette_endpoint_not_responding(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        with pytest.raises(asyncio.TimeoutError):
+            await client.get("/stuck")
+
+
+@pytest.mark.asyncio
+async def test_ensure_error_500(starlette_app):
+    async def error(request):
+        await asyncio.sleep(1)
+        raise Exception("Error!")
+
+    app = starlette_app
+    app.add_route("/error", error)
+    async with TestClient(app, raise_server_exceptions=False) as client:
+        resp = await client.get("/error")
+        assert resp.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_ensure_error_500_quart(quart_app):
+    async with TestClient(quart_app) as client:
+        resp = await client.get("/error")
+        assert resp.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_response_stream(quart_app):
+    async with TestClient(quart_app) as client:
+        resp = await client.get("/download_stream", stream=True)
+        assert resp.status_code == 200
+        chunks = [c async for c in resp.iter_content(1024)]
+        assert len(b"".join(chunks)) == 3 * 1024
+
+
+@pytest.mark.asyncio
+async def test_follow_redirects(quart_app):
+    async with TestClient(quart_app) as client:
+        resp = await client.get("/redir?path=/")
+        assert resp.status_code == 200
+        assert resp.text == "full response"

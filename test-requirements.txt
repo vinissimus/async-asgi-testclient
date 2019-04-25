@@ -1,4 +1,4 @@
-quart==0.8.1
+quart==0.9.0
 starlette==0.12.0.b3
 python-multipart==0.0.5
 pytest==4.4.0

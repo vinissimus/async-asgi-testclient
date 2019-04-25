@@ -22,22 +22,30 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-
 import asyncio
-import async_timeout
-import io
-import time
-import requests
 import traceback
+from aioerl import clear_mailbox
+from aioerl import receive
+from aioerl import receive_or_fail
+from aioerl import send
+from aioerl import spawn_link
+from aioerl import this_process
+from http.cookies import SimpleCookie
+from json import dumps
+from typing import Any
+from typing import AnyStr
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
+from urllib.parse import urlencode
+
+import requests
+from multidict import CIMultiDict
 
 from .compatibility import guarantee_single_callable
-from json import dumps
-from typing import Any, AnyStr, List, Optional, Tuple, Union
-from urllib.parse import urlencode
-from http.cookies import SimpleCookie
-from multidict import CIMultiDict
-from requests.models import Response
-from concurrent.futures import CancelledError
+from .response import BytesRW
+from .response import Response
 
 sentinel = object()
 
@@ -54,12 +62,14 @@ class TestClient:
         application,
         raise_server_exceptions: bool = False,
         use_cookies: bool = True,
+        timeout: int = 10,
     ):
         self.application = guarantee_single_callable(application)
         self.raise_server_exceptions = raise_server_exceptions
         self.cookie_jar = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self.timeout = timeout
 
     async def __aenter__(self):
         asyncio.ensure_future(
@@ -96,6 +106,7 @@ class TestClient:
         json: Any = sentinel,
         scheme: str = "http",
         cookies: Optional[dict] = None,
+        stream: bool = False,
     ):
         """Open a request to the app associated with this client.
 
@@ -131,12 +142,12 @@ class TestClient:
                 Cookies to send in the request instead of cookies in
                 TestClient.cookie_jar
 
+            stream
+                Return the response in streaming instead of buffering
+
         Returns:
             The response from the app handling the request.
         """
-        input_queue: asyncio.Queue[dict] = asyncio.Queue()
-        output_queue: asyncio.Queue[dict] = asyncio.Queue()
-
         headers, path, query_string_bytes = make_test_headers_path_and_query_string(
             self.application, path, headers, query_string
         )
@@ -185,54 +196,74 @@ class TestClient:
             "headers": flat_headers,
         }
 
-        future = asyncio.ensure_future(
-            self.application(scope, input_queue.get, output_queue.put)
-        )
+        try:
 
-        await input_queue.put({"type": "http.request", "body": request_data})
+            async def _receive():
+                m = await receive(timeout=self.timeout, process=self.proc)
+                return m.body
 
-        response = Response()
-        response.raw = io.BytesIO()
+            async def _send(el, parent_proc=this_process()):
+                return await send(parent_proc, el)
 
-        while await self._receive_nothing(output_queue) is False:
-            try:
-                message = await self._receive_output(future, output_queue)
-            except Exception as exc:
-                if not self.raise_server_exceptions:
-                    response.status_code = 500
-                    response.raw.write(
-                        bytes(
-                            "".join(traceback.format_tb(exc.__traceback__)),
-                            encoding="utf-8",
-                        )
-                    )
-                    await input_queue.put({"type": "http.disconnect"})
-                    break
+            self.proc = await spawn_link(self.application(scope, _receive, _send))
+
+            # Send request
+            await send(self.proc, {"type": "http.request", "body": request_data})
+
+            response = Response(stream, self.timeout, self.proc)
+
+            # Receive response start
+            message = await self.wait_response("http.response.start")
+            response.status_code = message["status"]
+            response.headers = CIMultiDict(
+                [(k.decode("utf8"), v.decode("utf8")) for k, v in message["headers"]]
+            )
+
+            # Receive initial response body
+            message = await self.wait_response("http.response.body")
+            response.raw.write(message["body"])
+            response._more_body = message.get("more_body", False)
+
+            # Consume the remaining response if not in stream
+            if not stream:
+                bytes_io = BytesRW()
+                bytes_io.write(response.raw.read())
+                async for chunk in response:
+                    bytes_io.write(chunk)
+                response.raw = bytes_io
+                response._content = bytes_io.read()
+                response._content_consumed = True
+
+        except asyncio.TimeoutError:
+            raise
+        except Exception as exc:
+            if self.raise_server_exceptions:
                 raise exc from None
 
-            if message["type"] == "http.response.start":
-                response.status_code = message["status"]
-                response.headers = CIMultiDict(
-                    [
-                        (k.decode("utf8"), v.decode("utf8"))
-                        for k, v in message["headers"]
-                    ]
-                )
-            elif message["type"] == "http.response.body":
-                response.raw.write(bytes(message["body"]))
-                if not message.get("more_body", False):
-                    await input_queue.put({"type": "http.disconnect"})
-                    break
-            else:
-                raise Exception(message)
+            response = Response(False, self.timeout, None)
+            response.status_code = 500
+            response.raw.write(
+                bytes("".join(traceback.format_tb(exc.__traceback__)), encoding="utf-8")
+            )
+            clear_mailbox()
+            return response
 
         if cookie_jar is not None:
             cookie_jar.load(response.headers.get("Set-Cookie", ""))
             response.cookies = requests.cookies.RequestsCookieJar()
             response.cookies.update(cookie_jar)
 
-        response.raw.seek(0)
-        return response
+        if response.is_redirect:
+            path = response.headers["location"]
+            return await self.get(path)
+        else:
+            return response
+
+    async def wait_response(self, type_):
+        message = await receive_or_fail("ok", timeout=self.timeout)
+        if message.body["type"] != type_:
+            raise Exception(f"Excpected message type '{type_}'. " f"Found {message}")
+        return message.body
 
     async def delete(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a DELETE request.
@@ -273,41 +304,6 @@ class TestClient:
         """Make a TRACE request.
         """
         return await self.open(*args, method="TRACE", **kwargs)
-
-    async def _receive_output(self, future, output_queue, timeout=1):
-        """
-        Receives a single message from the application, with optional timeout.
-        """
-        # Make sure there's not an exception to raise from the task
-        if future.done():
-            future.result()
-        # Wait and receive the message
-        try:
-            async with async_timeout.timeout(timeout):
-                return await output_queue.get()
-        except asyncio.TimeoutError as e:
-            # See if we have another error to raise inside
-            if future.done():
-                future.result()
-            else:
-                future.cancel()
-                try:
-                    await future
-                except CancelledError:
-                    pass
-            raise e
-
-    async def _receive_nothing(self, output_queue, timeout=0.1, interval=0.01):
-        """
-        Checks that there is no message to receive in the given time.
-        """
-        # `interval` has precedence over `timeout`
-        start = time.monotonic()
-        while time.monotonic() - start < timeout:
-            if not output_queue.empty():
-                return False
-            await asyncio.sleep(interval)
-        return output_queue.empty()
 
 
 def make_test_headers_path_and_query_string(

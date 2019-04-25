@@ -41,13 +41,14 @@ if __name__ == '__main__':
 `test_app.py`:
 ```python
 from asgi_testclient import TestClient
-from .my_api import app
 
 import pytest
 
 @pytest.mark.asyncio
 async def test_quart_app():
-    async with TestClient() as client:
+    from .my_api import app
+
+    async with TestClient(app) as client:
         resp = await client.get("/")
         assert resp.status_code == 200
         assert resp.text == "plain response"
@@ -57,9 +58,10 @@ async def test_quart_app():
         assert resp.json() == {"hello": "world"}
 ```
 
-## TODO
+## Supports
 
- - [ ] follow redirects
- - [ ] request / response streams
+ - [X] cookies
+ - [X] follow redirects
+ - [X] response streams
+ - [ ] request streams
  - [ ] websocket support
- - [ ] add more tests
