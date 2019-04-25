@@ -229,7 +229,7 @@ async def test_exception_capture(starlette_app):
 
     starlette_app.add_route("/raiser", view_raiser)
 
-    async with TestClient(starlette_app) as client:
+    async with TestClient(starlette_app, raise_server_exceptions=False) as client:
         resp = await client.get("/raiser")
         assert resp.status_code == 500
 
@@ -241,7 +241,7 @@ async def test_exception_capture_release(starlette_app):
 
     starlette_app.add_route("/raiser", view_raiser)
 
-    async with TestClient(starlette_app, raise_server_exceptions=True) as client:
+    async with TestClient(starlette_app) as client:
         with pytest.raises(AssertionError):
             await client.get("/raiser")
 
@@ -287,6 +287,28 @@ async def test_response_stream(quart_app):
         assert resp.status_code == 200
         chunks = [c async for c in resp.iter_content(1024)]
         assert len(b"".join(chunks)) == 3 * 1024
+
+
+@pytest.mark.asyncio
+async def test_response_stream_crashes(starlette_app):
+    from starlette.responses import StreamingResponse
+
+    @starlette_app.route("/download_stream_crashes")
+    async def stream_crashes(request):
+        def gen():
+            yield b'X' * 1024
+            yield b'X' * 1024
+            yield b'X' * 1024
+            raise Exception("Stream crashed!")
+        return StreamingResponse(gen())
+
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/download_stream_crashes", stream=True)
+        assert resp.status_code == 200
+
+        with pytest.raises(Exception):
+            async for _ in resp.iter_content(1024):
+                pass
 
 
 @pytest.mark.asyncio
