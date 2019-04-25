@@ -60,7 +60,7 @@ class TestClient:
     def __init__(
         self,
         application,
-        raise_server_exceptions: bool = False,
+        raise_server_exceptions: bool = True,
         use_cookies: bool = True,
         timeout: int = 10,
     ):
