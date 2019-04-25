@@ -45,7 +45,6 @@ class Response(_Response):
         self.raw = BytesRW()
 
     async def __aiter__(self):
-        """Allows you to use a response as an iterator."""
         async for c in self.iter_content(128):
             yield c
 
@@ -72,21 +71,6 @@ class Response(_Response):
         await receive_or_fail("exit")
 
     async def iter_content(self, chunk_size=1, decode_unicode=False):
-        """Iterates over the response data.  When stream=True is set on the
-        request, this avoids reading the content at once into memory for
-        large responses.  The chunk size is the number of bytes it should
-        read into memory.  This is not necessarily the length of each item
-        returned as decoding can take place.
-
-        chunk_size must be of type int or None. A value of None will
-        function differently depending on the value of `stream`.
-        stream=True will read data as it arrives in whatever size the
-        chunks are received. If stream=False, data is returned as
-        a single chunk.
-
-        If decode_unicode is True, content will be decoded using the best
-        available encoding based on the response.
-        """
         if self._content_consumed and isinstance(self._content, bool):
             raise StreamConsumedError()
         elif chunk_size is not None and not isinstance(chunk_size, int):
