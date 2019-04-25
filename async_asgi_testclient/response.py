@@ -44,12 +44,6 @@ class Response(_Response):
         self._more_body = False
         self.raw = BytesRW()
 
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        await self.close()
-
     async def __aiter__(self):
         """Allows you to use a response as an iterator."""
         async for c in self.iter_content(128):
@@ -111,12 +105,3 @@ class Response(_Response):
 
         async for c in chunks:
             yield c
-
-    async def close(self):
-        """Releases the connection back to the pool. Once this method has been
-        called the underlying ``raw`` object must not be accessed again.
-
-        *Note: Should not normally need to be called explicitly.*
-        """
-        if not self._content_consumed:
-            self.raw.close()
