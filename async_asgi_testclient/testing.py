@@ -24,8 +24,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import asyncio
 import inspect
-import traceback
-from aioerl import clear_mailbox
 from aioerl import receive
 from aioerl import receive_or_fail
 from aioerl import send
