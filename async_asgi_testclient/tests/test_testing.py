@@ -52,19 +52,6 @@ def quart_app():
     async def stuck():
         await asyncio.sleep(60)
 
-    @app.route("/error")
-    async def error():
-        raise Exception("Error!")
-
-    @app.route("/download_stream")
-    async def down_stream():
-        async def async_generator():
-            chunk = b"X" * 1024
-            for _ in range(3):
-                yield chunk
-
-        return async_generator()
-
     @app.route("/redir")
     async def redir():
         return redirect(request.args["path"])
@@ -223,19 +210,7 @@ async def test_disable_cookies_in_client(quart_app):
 
 
 @pytest.mark.asyncio
-async def test_exception_capture(starlette_app):
-    async def view_raiser(request):
-        assert 1 == 0
-
-    starlette_app.add_route("/raiser", view_raiser)
-
-    async with TestClient(starlette_app, raise_server_exceptions=False) as client:
-        resp = await client.get("/raiser")
-        assert resp.status_code == 500
-
-
-@pytest.mark.asyncio
-async def test_exception_capture_release(starlette_app):
+async def test_exception_starlette(starlette_app):
     async def view_raiser(request):
         assert 1 == 0
 
@@ -244,6 +219,18 @@ async def test_exception_capture_release(starlette_app):
     async with TestClient(starlette_app) as client:
         with pytest.raises(AssertionError):
             await client.get("/raiser")
+
+
+@pytest.mark.asyncio
+async def test_exception_quart(quart_app):
+    @quart_app.route("/raiser")
+    async def error():
+        assert 1 == 0
+
+    async with TestClient(quart_app) as client:
+        resp = await client.get("/raiser")
+        # Quart suppresses all type of exceptions
+        assert resp.status_code == 500
 
 
 @pytest.mark.asyncio
@@ -261,27 +248,42 @@ async def test_startlette_endpoint_not_responding(starlette_app):
 
 
 @pytest.mark.asyncio
-async def test_ensure_error_500(starlette_app):
-    async def error(request):
-        await asyncio.sleep(1)
-        raise Exception("Error!")
+async def test_request_stream(starlette_app):
+    from starlette.responses import StreamingResponse
 
-    app = starlette_app
-    app.add_route("/error", error)
-    async with TestClient(app, raise_server_exceptions=False) as client:
-        resp = await client.get("/error")
-        assert resp.status_code == 500
+    async def up_stream(request):
+        async def gen():
+            async for chunk in request.stream():
+                yield chunk
 
+        return StreamingResponse(gen())
 
-@pytest.mark.asyncio
-async def test_ensure_error_500_quart(quart_app):
-    async with TestClient(quart_app) as client:
-        resp = await client.get("/error")
-        assert resp.status_code == 500
+    starlette_app.add_route("/upload_stream", up_stream, methods=["POST"])
+
+    async with TestClient(starlette_app) as client:
+
+        async def stream_gen():
+            chunk = b"X" * 1024
+            for _ in range(3):
+                yield chunk
+
+        resp = await client.post("/upload_stream", data=stream_gen(), stream=True)
+        assert resp.status_code == 200
+        chunks = [c async for c in resp.iter_content(1024)]
+        assert len(b"".join(chunks)) == 3 * 1024
 
 
 @pytest.mark.asyncio
 async def test_response_stream(quart_app):
+    @quart_app.route("/download_stream")
+    async def down_stream():
+        async def async_generator():
+            chunk = b"X" * 1024
+            for _ in range(3):
+                yield chunk
+
+        return async_generator()
+
     async with TestClient(quart_app) as client:
         resp = await client.get("/download_stream", stream=True)
         assert resp.status_code == 200
@@ -296,10 +298,11 @@ async def test_response_stream_crashes(starlette_app):
     @starlette_app.route("/download_stream_crashes")
     async def stream_crashes(request):
         def gen():
-            yield b'X' * 1024
-            yield b'X' * 1024
-            yield b'X' * 1024
+            yield b"X" * 1024
+            yield b"X" * 1024
+            yield b"X" * 1024
             raise Exception("Stream crashed!")
+
         return StreamingResponse(gen())
 
     async with TestClient(starlette_app) as client:

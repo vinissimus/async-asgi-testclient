@@ -63,5 +63,5 @@ async def test_quart_app():
  - [X] cookies
  - [X] follow redirects
  - [X] response streams
- - [ ] request streams
+ - [X] request streams
  - [ ] websocket support

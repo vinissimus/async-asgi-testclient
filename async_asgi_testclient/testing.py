@@ -23,6 +23,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import asyncio
+import inspect
 import traceback
 from aioerl import clear_mailbox
 from aioerl import receive
@@ -33,7 +34,6 @@ from aioerl import this_process
 from http.cookies import SimpleCookie
 from json import dumps
 from typing import Any
-from typing import AnyStr
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -46,6 +46,7 @@ from multidict import CIMultiDict
 from .compatibility import guarantee_single_callable
 from .response import BytesRW
 from .response import Response
+from .utils import is_last_one
 
 sentinel = object()
 
@@ -57,15 +58,8 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(
-        self,
-        application,
-        raise_server_exceptions: bool = True,
-        use_cookies: bool = True,
-        timeout: int = 10,
-    ):
+    def __init__(self, application, use_cookies: bool = True, timeout: int = 10):
         self.application = guarantee_single_callable(application)
-        self.raise_server_exceptions = raise_server_exceptions
         self.cookie_jar = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
@@ -100,7 +94,7 @@ class TestClient:
         *,
         method: str = "GET",
         headers: Optional[Union[dict, CIMultiDict]] = None,
-        data: AnyStr = None,
+        data: Any = None,
         form: Optional[dict] = None,
         query_string: Optional[dict] = None,
         json: Any = sentinel,
@@ -123,7 +117,7 @@ class TestClient:
                 Headers to include in the request.
 
             data
-                Raw data to send in the request body.
+                Raw data to send in the request body or async generator
 
             form
                 Data to send form encoded in the request body.
@@ -196,57 +190,48 @@ class TestClient:
             "headers": flat_headers,
         }
 
-        try:
+        async def _receive():
+            m = await receive(timeout=self.timeout, process=self.proc)
+            return m.body
 
-            async def _receive():
-                m = await receive(timeout=self.timeout, process=self.proc)
-                return m.body
+        async def _send(el, parent_proc=this_process()):
+            return await send(parent_proc, el)
 
-            async def _send(el, parent_proc=this_process()):
-                return await send(parent_proc, el)
+        self.proc = await spawn_link(self.application(scope, _receive, _send))
 
-            self.proc = await spawn_link(self.application(scope, _receive, _send))
-
-            # Send request
+        # Send request
+        if inspect.isasyncgen(data):
+            async for is_last, body in is_last_one(data):
+                await send(
+                    self.proc,
+                    {"type": "http.request", "body": body, "more_body": not is_last},
+                )
+        else:
             await send(self.proc, {"type": "http.request", "body": request_data})
 
-            response = Response(stream, self.timeout, self.proc)
+        response = Response(stream, self.timeout, self.proc)
 
-            # Receive response start
-            message = await self.wait_response("http.response.start")
-            response.status_code = message["status"]
-            response.headers = CIMultiDict(
-                [(k.decode("utf8"), v.decode("utf8")) for k, v in message["headers"]]
-            )
+        # Receive response start
+        message = await self.wait_response("http.response.start")
+        response.status_code = message["status"]
+        response.headers = CIMultiDict(
+            [(k.decode("utf8"), v.decode("utf8")) for k, v in message["headers"]]
+        )
 
-            # Receive initial response body
-            message = await self.wait_response("http.response.body")
-            response.raw.write(message["body"])
-            response._more_body = message.get("more_body", False)
+        # Receive initial response body
+        message = await self.wait_response("http.response.body")
+        response.raw.write(message["body"])
+        response._more_body = message.get("more_body", False)
 
-            # Consume the remaining response if not in stream
-            if not stream:
-                bytes_io = BytesRW()
-                bytes_io.write(response.raw.read())
-                async for chunk in response:
-                    bytes_io.write(chunk)
-                response.raw = bytes_io
-                response._content = bytes_io.read()
-                response._content_consumed = True
-
-        except asyncio.TimeoutError:
-            raise
-        except Exception as exc:
-            if self.raise_server_exceptions:
-                raise exc from None
-
-            response = Response(False, self.timeout, None)
-            response.status_code = 500
-            response.raw.write(
-                bytes("".join(traceback.format_tb(exc.__traceback__)), encoding="utf-8")
-            )
-            clear_mailbox()
-            return response
+        # Consume the remaining response if not in stream
+        if not stream:
+            bytes_io = BytesRW()
+            bytes_io.write(response.raw.read())
+            async for chunk in response:
+                bytes_io.write(chunk)
+            response.raw = bytes_io
+            response._content = bytes_io.read()
+            response._content_consumed = True
 
         if cookie_jar is not None:
             cookie_jar.load(response.headers.get("Set-Cookie", ""))
