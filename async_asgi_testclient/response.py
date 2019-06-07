@@ -1,11 +1,9 @@
-import io
-from aioerl import receive_or_fail
-from aioerl import send
-
 from requests.exceptions import StreamConsumedError
 from requests.models import Response as _Response
 from requests.utils import iter_slices
 from requests.utils import stream_decode_response_unicode
+
+import io
 
 
 class BytesRW(object):
@@ -35,12 +33,12 @@ class BytesRW(object):
 
 
 class Response(_Response):
-    def __init__(self, stream: bool, timeout, process):
+    def __init__(self, stream: bool, receive, send):
         super().__init__()
 
         self.stream = stream
-        self.timeout = timeout
-        self.process = process
+        self.receive_or_fail = receive
+        self.send = send
         self._more_body = False
         self.raw = BytesRW()
 
@@ -56,19 +54,21 @@ class Response(_Response):
             yield val
 
         while self._more_body:
-            message = await receive_or_fail("ok", timeout=self.timeout)
-            if message.body["type"] != "http.response.body":
+            message = await self.receive_or_fail()
+            if not isinstance(message, dict):
+                raise Exception(f"Unexpected message {message}")
+            if message["type"] != "http.response.body":
                 raise Exception(
                     f"Excpected message type 'http.response.body'. " f"Found {message}"
                 )
 
-            message = message.body
             yield message["body"]
             self._more_body = message.get("more_body", False)
 
         # Send disconnect
-        await send(self.process, {"type": "http.disconnect"})
-        await receive_or_fail("exit")
+        self.send({"type": "http.disconnect"})
+        message = await self.receive_or_fail()
+        assert message.event == "exit"
 
     async def iter_content(self, chunk_size=1, decode_unicode=False):
         if self._content_consumed and isinstance(self._content, bool):
@@ -77,11 +77,10 @@ class Response(_Response):
             raise TypeError(
                 "chunk_size must be an int, it is instead a %s." % type(chunk_size)
             )
+
         # simulate reading small chunks of the content
         reused_chunks = iter_slices(self._content, chunk_size)
-
         stream_chunks = self.generate(chunk_size)
-
         chunks = reused_chunks if self._content_consumed else stream_chunks
 
         if decode_unicode:

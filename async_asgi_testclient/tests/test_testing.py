@@ -274,6 +274,35 @@ async def test_request_stream(starlette_app):
 
 
 @pytest.mark.asyncio
+async def test_upload_stream_from_download_stream(starlette_app):
+    from starlette.responses import StreamingResponse
+
+    async def down_stream(request):
+        def gen():
+            for _ in range(3):
+                yield b"X" * 1024
+
+        return StreamingResponse(gen())
+
+    async def up_stream(request):
+        async def gen():
+            async for chunk in request.stream():
+                yield chunk
+
+        return StreamingResponse(gen())
+
+    starlette_app.add_route("/download_stream", down_stream, methods=["GET"])
+    starlette_app.add_route("/upload_stream", up_stream, methods=["POST"])
+
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/download_stream", stream=True)
+        assert resp.status_code == 200
+        resp2 = await client.post("/upload_stream", data=resp.iter_content(1024), stream=True)
+        chunks = [c async for c in resp2.iter_content(1024)]
+        assert len(b"".join(chunks)) == 3 * 1024
+
+
+@pytest.mark.asyncio
 async def test_response_stream(quart_app):
     @quart_app.route("/download_stream")
     async def down_stream():

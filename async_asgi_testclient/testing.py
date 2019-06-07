@@ -22,15 +22,17 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import asyncio
-import inspect
-from aioerl import receive
-from aioerl import receive_or_fail
-from aioerl import send
-from aioerl import spawn_link
-from aioerl import this_process
+from async_asgi_testclient.compatibility import guarantee_single_callable
+from async_asgi_testclient.response import BytesRW
+from async_asgi_testclient.response import Response
+from async_asgi_testclient.utils import create_monitored_task
+from async_asgi_testclient.utils import is_last_one
+from async_asgi_testclient.utils import receive
+from async_asgi_testclient.utils import set_timeout
+from functools import partial
 from http.cookies import SimpleCookie
 from json import dumps
+from multidict import CIMultiDict
 from typing import Any
 from typing import List
 from typing import Optional
@@ -38,13 +40,9 @@ from typing import Tuple
 from typing import Union
 from urllib.parse import urlencode
 
+import asyncio
+import inspect
 import requests
-from multidict import CIMultiDict
-
-from .compatibility import guarantee_single_callable
-from .response import BytesRW
-from .response import Response
-from .utils import is_last_one
 
 sentinel = object()
 
@@ -56,15 +54,16 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(self, application, use_cookies: bool = True, timeout: int = 10):
+    def __init__(self, application, use_cookies: bool = True, timeout: Optional[int] = None):
         self.application = guarantee_single_callable(application)
         self.cookie_jar = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.timeout = timeout
+        self.timeout_tasks = []
 
     async def __aenter__(self):
-        asyncio.ensure_future(
+        asyncio.create_task(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
                 self._lifespan_input_queue.get,
@@ -76,6 +75,10 @@ class TestClient:
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.send_lifespan("shutdown")
+        for task in self.timeout_tasks:
+            if not task.cancelled():
+                task.cancel()
+        self.timeout_tasks = None
 
     async def send_lifespan(self, action):
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
@@ -140,6 +143,9 @@ class TestClient:
         Returns:
             The response from the app handling the request.
         """
+        input_queue: asyncio.Queue[dict] = asyncio.Queue()
+        output_queue: asyncio.Queue[dict] = asyncio.Queue()
+
         headers, path, query_string_bytes = make_test_headers_path_and_query_string(
             self.application, path, headers, query_string
         )
@@ -188,36 +194,35 @@ class TestClient:
             "headers": flat_headers,
         }
 
-        async def _receive():
-            m = await receive(timeout=self.timeout, process=self.proc)
-            return m.body
+        create_monitored_task(
+            self.application(scope, input_queue.get, output_queue.put),
+            output_queue.put_nowait
+        )
+        self.timeout_tasks += [await set_timeout(output_queue, self.timeout)]
 
-        async def _send(el, parent_proc=this_process()):
-            return await send(parent_proc, el)
-
-        self.proc = await spawn_link(self.application(scope, _receive, _send))
+        send = input_queue.put_nowait
+        receive_or_fail = partial(receive, output_queue)
 
         # Send request
         if inspect.isasyncgen(data):
             async for is_last, body in is_last_one(data):
-                await send(
-                    self.proc,
-                    {"type": "http.request", "body": body, "more_body": not is_last},
+                send(
+                    {"type": "http.request", "body": body, "more_body": not is_last}
                 )
         else:
-            await send(self.proc, {"type": "http.request", "body": request_data})
+            send({"type": "http.request", "body": request_data})
 
-        response = Response(stream, self.timeout, self.proc)
+        response = Response(stream, receive_or_fail, send)
 
         # Receive response start
-        message = await self.wait_response("http.response.start")
+        message = await self.wait_response(receive_or_fail, "http.response.start")
         response.status_code = message["status"]
         response.headers = CIMultiDict(
             [(k.decode("utf8"), v.decode("utf8")) for k, v in message["headers"]]
         )
 
         # Receive initial response body
-        message = await self.wait_response("http.response.body")
+        message = await self.wait_response(receive_or_fail, "http.response.body")
         response.raw.write(message["body"])
         response._more_body = message.get("more_body", False)
 
@@ -242,11 +247,13 @@ class TestClient:
         else:
             return response
 
-    async def wait_response(self, type_):
-        message = await receive_or_fail("ok", timeout=self.timeout)
-        if message.body["type"] != type_:
+    async def wait_response(self, receive_or_fail, type_):
+        message = await receive_or_fail()
+        if not isinstance(message, dict):
+            raise Exception(f"Unexpected message {message}")
+        if message["type"] != type_:
             raise Exception(f"Excpected message type '{type_}'. " f"Found {message}")
-        return message.body
+        return message
 
     async def delete(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a DELETE request.
