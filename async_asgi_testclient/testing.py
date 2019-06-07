@@ -22,22 +22,27 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from async_asgi_testclient.compatibility import guarantee_single_callable
+from async_asgi_testclient.response import BytesRW
+from async_asgi_testclient.response import Response
+from async_asgi_testclient.utils import create_monitored_task
+from async_asgi_testclient.utils import is_last_one
+from async_asgi_testclient.utils import receive
+from async_asgi_testclient.utils import set_timeout
+from functools import partial
+from http.cookies import SimpleCookie
+from json import dumps
+from multidict import CIMultiDict
+from typing import Any
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
+from urllib.parse import urlencode
 
 import asyncio
-import async_timeout
-import io
-import time
+import inspect
 import requests
-import traceback
-
-from .compatibility import guarantee_single_callable
-from json import dumps
-from typing import Any, AnyStr, List, Optional, Tuple, Union
-from urllib.parse import urlencode
-from http.cookies import SimpleCookie
-from multidict import CIMultiDict
-from requests.models import Response
-from concurrent.futures import CancelledError
 
 sentinel = object()
 
@@ -49,20 +54,16 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(
-        self,
-        application,
-        raise_server_exceptions: bool = False,
-        use_cookies: bool = True,
-    ):
+    def __init__(self, application, use_cookies: bool = True, timeout: Optional[int] = None):
         self.application = guarantee_single_callable(application)
-        self.raise_server_exceptions = raise_server_exceptions
         self.cookie_jar = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self.timeout = timeout
+        self.timeout_tasks = []
 
     async def __aenter__(self):
-        asyncio.ensure_future(
+        asyncio.create_task(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
                 self._lifespan_input_queue.get,
@@ -74,6 +75,10 @@ class TestClient:
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.send_lifespan("shutdown")
+        for task in self.timeout_tasks:
+            if not task.cancelled():
+                task.cancel()
+        self.timeout_tasks = None
 
     async def send_lifespan(self, action):
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
@@ -90,12 +95,13 @@ class TestClient:
         *,
         method: str = "GET",
         headers: Optional[Union[dict, CIMultiDict]] = None,
-        data: AnyStr = None,
+        data: Any = None,
         form: Optional[dict] = None,
         query_string: Optional[dict] = None,
         json: Any = sentinel,
         scheme: str = "http",
         cookies: Optional[dict] = None,
+        stream: bool = False,
     ):
         """Open a request to the app associated with this client.
 
@@ -112,7 +118,7 @@ class TestClient:
                 Headers to include in the request.
 
             data
-                Raw data to send in the request body.
+                Raw data to send in the request body or async generator
 
             form
                 Data to send form encoded in the request body.
@@ -130,6 +136,9 @@ class TestClient:
             cookies
                 Cookies to send in the request instead of cookies in
                 TestClient.cookie_jar
+
+            stream
+                Return the response in streaming instead of buffering
 
         Returns:
             The response from the app handling the request.
@@ -185,54 +194,66 @@ class TestClient:
             "headers": flat_headers,
         }
 
-        future = asyncio.ensure_future(
-            self.application(scope, input_queue.get, output_queue.put)
+        create_monitored_task(
+            self.application(scope, input_queue.get, output_queue.put),
+            output_queue.put_nowait
+        )
+        self.timeout_tasks += [await set_timeout(output_queue, self.timeout)]
+
+        send = input_queue.put_nowait
+        receive_or_fail = partial(receive, output_queue)
+
+        # Send request
+        if inspect.isasyncgen(data):
+            async for is_last, body in is_last_one(data):
+                send(
+                    {"type": "http.request", "body": body, "more_body": not is_last}
+                )
+        else:
+            send({"type": "http.request", "body": request_data})
+
+        response = Response(stream, receive_or_fail, send)
+
+        # Receive response start
+        message = await self.wait_response(receive_or_fail, "http.response.start")
+        response.status_code = message["status"]
+        response.headers = CIMultiDict(
+            [(k.decode("utf8"), v.decode("utf8")) for k, v in message["headers"]]
         )
 
-        await input_queue.put({"type": "http.request", "body": request_data})
+        # Receive initial response body
+        message = await self.wait_response(receive_or_fail, "http.response.body")
+        response.raw.write(message["body"])
+        response._more_body = message.get("more_body", False)
 
-        response = Response()
-        response.raw = io.BytesIO()
-
-        while await self._receive_nothing(output_queue) is False:
-            try:
-                message = await self._receive_output(future, output_queue)
-            except Exception as exc:
-                if not self.raise_server_exceptions:
-                    response.status_code = 500
-                    response.raw.write(
-                        bytes(
-                            "".join(traceback.format_tb(exc.__traceback__)),
-                            encoding="utf-8",
-                        )
-                    )
-                    await input_queue.put({"type": "http.disconnect"})
-                    break
-                raise exc from None
-
-            if message["type"] == "http.response.start":
-                response.status_code = message["status"]
-                response.headers = CIMultiDict(
-                    [
-                        (k.decode("utf8"), v.decode("utf8"))
-                        for k, v in message["headers"]
-                    ]
-                )
-            elif message["type"] == "http.response.body":
-                response.raw.write(bytes(message["body"]))
-                if not message.get("more_body", False):
-                    await input_queue.put({"type": "http.disconnect"})
-                    break
-            else:
-                raise Exception(message)
+        # Consume the remaining response if not in stream
+        if not stream:
+            bytes_io = BytesRW()
+            bytes_io.write(response.raw.read())
+            async for chunk in response:
+                bytes_io.write(chunk)
+            response.raw = bytes_io
+            response._content = bytes_io.read()
+            response._content_consumed = True
 
         if cookie_jar is not None:
             cookie_jar.load(response.headers.get("Set-Cookie", ""))
             response.cookies = requests.cookies.RequestsCookieJar()
             response.cookies.update(cookie_jar)
 
-        response.raw.seek(0)
-        return response
+        if response.is_redirect:
+            path = response.headers["location"]
+            return await self.get(path)
+        else:
+            return response
+
+    async def wait_response(self, receive_or_fail, type_):
+        message = await receive_or_fail()
+        if not isinstance(message, dict):
+            raise Exception(f"Unexpected message {message}")
+        if message["type"] != type_:
+            raise Exception(f"Excpected message type '{type_}'. " f"Found {message}")
+        return message
 
     async def delete(self, *args: Any, **kwargs: Any) -> bytes:
         """Make a DELETE request.
@@ -273,41 +294,6 @@ class TestClient:
         """Make a TRACE request.
         """
         return await self.open(*args, method="TRACE", **kwargs)
-
-    async def _receive_output(self, future, output_queue, timeout=1):
-        """
-        Receives a single message from the application, with optional timeout.
-        """
-        # Make sure there's not an exception to raise from the task
-        if future.done():
-            future.result()
-        # Wait and receive the message
-        try:
-            async with async_timeout.timeout(timeout):
-                return await output_queue.get()
-        except asyncio.TimeoutError as e:
-            # See if we have another error to raise inside
-            if future.done():
-                future.result()
-            else:
-                future.cancel()
-                try:
-                    await future
-                except CancelledError:
-                    pass
-            raise e
-
-    async def _receive_nothing(self, output_queue, timeout=0.1, interval=0.01):
-        """
-        Checks that there is no message to receive in the given time.
-        """
-        # `interval` has precedence over `timeout`
-        start = time.monotonic()
-        while time.monotonic() - start < timeout:
-            if not output_queue.empty():
-                return False
-            await asyncio.sleep(interval)
-        return output_queue.empty()
 
 
 def make_test_headers_path_and_query_string(

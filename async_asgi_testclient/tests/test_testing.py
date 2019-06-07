@@ -1,11 +1,12 @@
 from async_asgi_testclient import TestClient
 
+import asyncio
 import pytest
 
 
 @pytest.fixture
 def quart_app():
-    from quart import Quart, jsonify, request, Response
+    from quart import Quart, jsonify, request, redirect, Response
 
     app = Quart(__name__)
 
@@ -46,6 +47,14 @@ def quart_app():
     async def get_cookie():
         cookies = request.cookies
         return jsonify(cookies)
+
+    @app.route("/stuck")
+    async def stuck():
+        await asyncio.sleep(60)
+
+    @app.route("/redir")
+    async def redir():
+        return redirect(request.args["path"])
 
     yield app
 
@@ -95,11 +104,15 @@ def starlette_app():
         cookies = request.cookies
         return JSONResponse(cookies)
 
+    @app.route("/stuck")
+    async def stuck(request):
+        await asyncio.sleep(60)
+
     yield app
 
 
 @pytest.mark.asyncio
-async def test_Quart_TestClient(quart_app):
+async def test_TestClient_Quart(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.get("/")
         assert resp.status_code == 200
@@ -133,7 +146,7 @@ async def test_Quart_TestClient(quart_app):
 
 
 @pytest.mark.asyncio
-async def test_Starlette_TestClient(starlette_app):
+async def test_TestClient_Starlette(starlette_app):
     async with TestClient(starlette_app) as client:
         resp = await client.get("/")
         assert resp.status_code == 200
@@ -197,24 +210,142 @@ async def test_disable_cookies_in_client(quart_app):
 
 
 @pytest.mark.asyncio
-async def test_exception_capture(starlette_app):
+async def test_exception_starlette(starlette_app):
     async def view_raiser(request):
         assert 1 == 0
 
     starlette_app.add_route("/raiser", view_raiser)
 
     async with TestClient(starlette_app) as client:
+        with pytest.raises(AssertionError):
+            await client.get("/raiser")
+
+
+@pytest.mark.asyncio
+async def test_exception_quart(quart_app):
+    @quart_app.route("/raiser")
+    async def error():
+        assert 1 == 0
+
+    async with TestClient(quart_app) as client:
         resp = await client.get("/raiser")
+        # Quart suppresses all type of exceptions
         assert resp.status_code == 500
 
 
 @pytest.mark.asyncio
-async def test_exception_capture_release(starlette_app):
-    async def view_raiser(request):
-        assert 1 == 0
+async def test_quart_endpoint_not_responding(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        with pytest.raises(asyncio.TimeoutError):
+            await client.get("/stuck")
 
-    starlette_app.add_route("/raiser", view_raiser)
 
-    async with TestClient(starlette_app, raise_server_exceptions=True) as client:
-        with pytest.raises(AssertionError):
-            await client.get("/raiser")
+@pytest.mark.asyncio
+async def test_startlette_endpoint_not_responding(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        with pytest.raises(asyncio.TimeoutError):
+            await client.get("/stuck")
+
+
+@pytest.mark.asyncio
+async def test_request_stream(starlette_app):
+    from starlette.responses import StreamingResponse
+
+    async def up_stream(request):
+        async def gen():
+            async for chunk in request.stream():
+                yield chunk
+
+        return StreamingResponse(gen())
+
+    starlette_app.add_route("/upload_stream", up_stream, methods=["POST"])
+
+    async with TestClient(starlette_app) as client:
+
+        async def stream_gen():
+            chunk = b"X" * 1024
+            for _ in range(3):
+                yield chunk
+
+        resp = await client.post("/upload_stream", data=stream_gen(), stream=True)
+        assert resp.status_code == 200
+        chunks = [c async for c in resp.iter_content(1024)]
+        assert len(b"".join(chunks)) == 3 * 1024
+
+
+@pytest.mark.asyncio
+async def test_upload_stream_from_download_stream(starlette_app):
+    from starlette.responses import StreamingResponse
+
+    async def down_stream(request):
+        def gen():
+            for _ in range(3):
+                yield b"X" * 1024
+
+        return StreamingResponse(gen())
+
+    async def up_stream(request):
+        async def gen():
+            async for chunk in request.stream():
+                yield chunk
+
+        return StreamingResponse(gen())
+
+    starlette_app.add_route("/download_stream", down_stream, methods=["GET"])
+    starlette_app.add_route("/upload_stream", up_stream, methods=["POST"])
+
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/download_stream", stream=True)
+        assert resp.status_code == 200
+        resp2 = await client.post("/upload_stream", data=resp.iter_content(1024), stream=True)
+        chunks = [c async for c in resp2.iter_content(1024)]
+        assert len(b"".join(chunks)) == 3 * 1024
+
+
+@pytest.mark.asyncio
+async def test_response_stream(quart_app):
+    @quart_app.route("/download_stream")
+    async def down_stream():
+        async def async_generator():
+            chunk = b"X" * 1024
+            for _ in range(3):
+                yield chunk
+
+        return async_generator()
+
+    async with TestClient(quart_app) as client:
+        resp = await client.get("/download_stream", stream=True)
+        assert resp.status_code == 200
+        chunks = [c async for c in resp.iter_content(1024)]
+        assert len(b"".join(chunks)) == 3 * 1024
+
+
+@pytest.mark.asyncio
+async def test_response_stream_crashes(starlette_app):
+    from starlette.responses import StreamingResponse
+
+    @starlette_app.route("/download_stream_crashes")
+    async def stream_crashes(request):
+        def gen():
+            yield b"X" * 1024
+            yield b"X" * 1024
+            yield b"X" * 1024
+            raise Exception("Stream crashed!")
+
+        return StreamingResponse(gen())
+
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/download_stream_crashes", stream=True)
+        assert resp.status_code == 200
+
+        with pytest.raises(Exception):
+            async for _ in resp.iter_content(1024):
+                pass
+
+
+@pytest.mark.asyncio
+async def test_follow_redirects(quart_app):
+    async with TestClient(quart_app) as client:
+        resp = await client.get("/redir?path=/")
+        assert resp.status_code == 200
+        assert resp.text == "full response"

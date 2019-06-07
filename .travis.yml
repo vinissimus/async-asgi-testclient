@@ -10,5 +10,4 @@ install:
 script:
   - black async_asgi_testclient
   - flake8 async_asgi_testclient
-  - mypy async_asgi_testclient
   - pytest --cov=async_asgi_testclient async_asgi_testclient -v
