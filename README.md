@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
 `test_app.py`:
 ```python
-from asgi_testclient import TestClient
+from async_asgi_testclient import TestClient
 
 import pytest
 
