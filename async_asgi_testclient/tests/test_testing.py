@@ -2,6 +2,9 @@ from async_asgi_testclient import TestClient
 
 import asyncio
 import pytest
+import sys
+
+PY37 = sys.version_info >= (3, 7)
 
 
 @pytest.fixture
@@ -112,6 +115,7 @@ def starlette_app():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_TestClient_Quart(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.get("/")
@@ -179,6 +183,7 @@ async def test_TestClient_Starlette(starlette_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_set_cookie_in_request(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.post(
@@ -200,6 +205,7 @@ async def test_set_cookie_in_request(quart_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_disable_cookies_in_client(quart_app):
     async with TestClient(quart_app, use_cookies=False) as client:
         resp = await client.post(
@@ -222,6 +228,7 @@ async def test_exception_starlette(starlette_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_exception_quart(quart_app):
     @quart_app.route("/raiser")
     async def error():
@@ -234,6 +241,7 @@ async def test_exception_quart(quart_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_quart_endpoint_not_responding(quart_app):
     async with TestClient(quart_app, timeout=0.1) as client:
         with pytest.raises(asyncio.TimeoutError):
@@ -297,12 +305,15 @@ async def test_upload_stream_from_download_stream(starlette_app):
     async with TestClient(starlette_app) as client:
         resp = await client.get("/download_stream", stream=True)
         assert resp.status_code == 200
-        resp2 = await client.post("/upload_stream", data=resp.iter_content(1024), stream=True)
+        resp2 = await client.post(
+            "/upload_stream", data=resp.iter_content(1024), stream=True
+        )
         chunks = [c async for c in resp2.iter_content(1024)]
         assert len(b"".join(chunks)) == 3 * 1024
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_response_stream(quart_app):
     @quart_app.route("/download_stream")
     async def down_stream():
@@ -344,6 +355,7 @@ async def test_response_stream_crashes(starlette_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_follow_redirects(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.get("/redir?path=/")

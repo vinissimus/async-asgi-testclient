@@ -28,7 +28,6 @@ from async_asgi_testclient.response import Response
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import is_last_one
 from async_asgi_testclient.utils import receive
-from async_asgi_testclient.utils import set_timeout
 from functools import partial
 from http.cookies import SimpleCookie
 from json import dumps
@@ -54,16 +53,17 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(self, application, use_cookies: bool = True, timeout: Optional[int] = None):
+    def __init__(
+        self, application, use_cookies: bool = True, timeout: Optional[int] = None
+    ):
         self.application = guarantee_single_callable(application)
         self.cookie_jar = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.timeout = timeout
-        self.timeout_tasks = []
 
     async def __aenter__(self):
-        asyncio.create_task(
+        asyncio.ensure_future(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
                 self._lifespan_input_queue.get,
@@ -75,10 +75,6 @@ class TestClient:
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.send_lifespan("shutdown")
-        for task in self.timeout_tasks:
-            if not task.cancelled():
-                task.cancel()
-        self.timeout_tasks = None
 
     async def send_lifespan(self, action):
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
@@ -196,19 +192,16 @@ class TestClient:
 
         create_monitored_task(
             self.application(scope, input_queue.get, output_queue.put),
-            output_queue.put_nowait
+            output_queue.put_nowait,
         )
-        self.timeout_tasks += [await set_timeout(output_queue, self.timeout)]
 
         send = input_queue.put_nowait
-        receive_or_fail = partial(receive, output_queue)
+        receive_or_fail = partial(receive, output_queue, timeout=self.timeout)
 
         # Send request
         if inspect.isasyncgen(data):
             async for is_last, body in is_last_one(data):
-                send(
-                    {"type": "http.request", "body": body, "more_body": not is_last}
-                )
+                send({"type": "http.request", "body": body, "more_body": not is_last})
         else:
             send({"type": "http.request", "body": request_data})
 
