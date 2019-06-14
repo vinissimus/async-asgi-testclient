@@ -27,6 +27,7 @@ from async_asgi_testclient.response import BytesRW
 from async_asgi_testclient.response import Response
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import is_last_one
+from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
 from functools import partial
 from http.cookies import SimpleCookie
@@ -63,13 +64,15 @@ class TestClient:
         self.timeout = timeout
 
     async def __aenter__(self):
-        asyncio.ensure_future(
+        create_monitored_task(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
                 self._lifespan_input_queue.get,
                 self._lifespan_output_queue.put,
-            )
+            ),
+            self._lifespan_output_queue.put_nowait,
         )
+
         await self.send_lifespan("startup")
         return self
 
@@ -78,7 +81,10 @@ class TestClient:
 
     async def send_lifespan(self, action):
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
-        message = await self._lifespan_output_queue.get()
+        message = await receive(self._lifespan_output_queue)
+
+        if isinstance(message, Message):
+            raise Exception(f"{message.event} - {message.reason} - {message.task}")
 
         if message["type"] == f"lifespan.{action}.complete":
             pass
