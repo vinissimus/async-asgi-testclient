@@ -13,8 +13,7 @@ async def is_last_one(gen):
         yield (True, prev_el)
 
 
-class Message():
-
+class Message:
     def __init__(self, event, reason, task):
         self.event: str = event
         self.reason: str = reason

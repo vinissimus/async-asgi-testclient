@@ -4,7 +4,6 @@ import asyncio
 import pytest
 import sys
 
-
 PY37 = sys.version_info >= (3, 7)
 
 
@@ -306,7 +305,9 @@ async def test_upload_stream_from_download_stream(starlette_app):
     async with TestClient(starlette_app) as client:
         resp = await client.get("/download_stream", stream=True)
         assert resp.status_code == 200
-        resp2 = await client.post("/upload_stream", data=resp.iter_content(1024), stream=True)
+        resp2 = await client.post(
+            "/upload_stream", data=resp.iter_content(1024), stream=True
+        )
         chunks = [c async for c in resp2.iter_content(1024)]
         assert len(b"".join(chunks)) == 3 * 1024
 

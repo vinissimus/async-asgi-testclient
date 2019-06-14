@@ -53,7 +53,9 @@ class TestClient:
     the app for testing purposes.
     """
 
-    def __init__(self, application, use_cookies: bool = True, timeout: Optional[int] = None):
+    def __init__(
+        self, application, use_cookies: bool = True, timeout: Optional[int] = None
+    ):
         self.application = guarantee_single_callable(application)
         self.cookie_jar = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
@@ -190,7 +192,7 @@ class TestClient:
 
         create_monitored_task(
             self.application(scope, input_queue.get, output_queue.put),
-            output_queue.put_nowait
+            output_queue.put_nowait,
         )
 
         send = input_queue.put_nowait
@@ -199,9 +201,7 @@ class TestClient:
         # Send request
         if inspect.isasyncgen(data):
             async for is_last, body in is_last_one(data):
-                send(
-                    {"type": "http.request", "body": body, "more_body": not is_last}
-                )
+                send({"type": "http.request", "body": body, "more_body": not is_last})
         else:
             send({"type": "http.request", "body": request_data})
 
