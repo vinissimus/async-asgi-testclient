@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from functools import partial
 
 import asyncio
@@ -14,12 +13,12 @@ async def is_last_one(gen):
         yield (True, prev_el)
 
 
-@dataclass
 class Message():
 
-    event: str
-    reason: str
-    task: asyncio.Task
+    def __init__(self, event, reason, task):
+        self.event: str = event
+        self.reason: str = reason
+        self.task: asyncio.Task = task
 
 
 def create_monitored_task(coro, send):
@@ -28,24 +27,27 @@ def create_monitored_task(coro, send):
     return future
 
 
-async def receive(ch):
+async def receive(ch, timeout=None):
+    fut = set_timeout(ch, timeout)
     msg = await ch.get()
+    if not fut.cancelled():
+        fut.cancel()
     if isinstance(msg, Message):
         if msg.event == "err":
             raise msg.reason
     return msg
 
 
-def _callback(ch, fut):
+def _callback(send, fut):
     try:
         fut.result()
     except asyncio.CancelledError:
-        ch(Message("exit", "killed", fut))
+        send(Message("exit", "killed", fut))
         raise
     except Exception as e:
-        ch(Message("err", e, fut))
+        send(Message("err", e, fut))
     else:
-        ch(Message("exit", "normal", fut))
+        send(Message("exit", "normal", fut))
 
 
 async def _send_after(timeout, queue, msg):
@@ -55,7 +57,7 @@ async def _send_after(timeout, queue, msg):
     await queue.put(msg)
 
 
-async def set_timeout(queue, timeout):
+def set_timeout(queue, timeout):
     task = asyncio.current_task()
     msg = Message("err", asyncio.TimeoutError, task)
     return asyncio.create_task(_send_after(timeout, queue, msg))
