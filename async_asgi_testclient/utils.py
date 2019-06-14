@@ -22,7 +22,7 @@ class Message():
 
 
 def create_monitored_task(coro, send):
-    future = asyncio.create_task(coro)
+    future = asyncio.ensure_future(coro)
     future.add_done_callback(partial(_callback, send))
     return future
 
@@ -58,6 +58,6 @@ async def _send_after(timeout, queue, msg):
 
 
 def set_timeout(queue, timeout):
-    task = asyncio.current_task()
+    task = asyncio.Task.current_task()
     msg = Message("err", asyncio.TimeoutError, task)
-    return asyncio.create_task(_send_after(timeout, queue, msg))
+    return asyncio.ensure_future(_send_after(timeout, queue, msg))

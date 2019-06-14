@@ -61,7 +61,7 @@ class TestClient:
         self.timeout = timeout
 
     async def __aenter__(self):
-        asyncio.create_task(
+        asyncio.ensure_future(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
                 self._lifespan_input_queue.get,

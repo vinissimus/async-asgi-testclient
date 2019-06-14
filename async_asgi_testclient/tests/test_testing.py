@@ -312,6 +312,7 @@ async def test_upload_stream_from_download_stream(starlette_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
 async def test_response_stream(quart_app):
     @quart_app.route("/download_stream")
     async def down_stream():
