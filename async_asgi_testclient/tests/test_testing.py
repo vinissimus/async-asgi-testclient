@@ -361,3 +361,11 @@ async def test_follow_redirects(quart_app):
         resp = await client.get("/redir?path=/")
         assert resp.status_code == 200
         assert resp.text == "full response"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY37 != True")
+async def test_no_follow_redirects(quart_app):
+    async with TestClient(quart_app) as client:
+        resp = await client.get("/redir?path=/", allow_redirects=False)
+        assert resp.status_code == 302

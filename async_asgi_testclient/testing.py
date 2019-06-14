@@ -104,6 +104,7 @@ class TestClient:
         scheme: str = "http",
         cookies: Optional[dict] = None,
         stream: bool = False,
+        allow_redirects: bool = True,
     ):
         """Open a request to the app associated with this client.
 
@@ -141,6 +142,9 @@ class TestClient:
 
             stream
                 Return the response in streaming instead of buffering
+
+            allow_redirects
+                If set to True follows redirects
 
         Returns:
             The response from the app handling the request.
@@ -240,7 +244,7 @@ class TestClient:
             response.cookies = requests.cookies.RequestsCookieJar()
             response.cookies.update(cookie_jar)
 
-        if response.is_redirect:
+        if allow_redirects and response.is_redirect:
             path = response.headers["location"]
             return await self.get(path)
         else:
