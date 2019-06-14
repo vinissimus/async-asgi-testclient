@@ -1,4 +1,4 @@
-quart==0.9.1
+quart==0.9.1; python_version > '3.6'
 starlette==0.12.0
 python-multipart==0.0.5
 pytest==4.6.2

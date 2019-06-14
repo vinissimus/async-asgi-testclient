@@ -2,6 +2,10 @@ from async_asgi_testclient import TestClient
 
 import asyncio
 import pytest
+import sys
+
+
+PY36 = sys.version_info <= (3, 6)
 
 
 @pytest.fixture
@@ -112,6 +116,7 @@ def starlette_app():
 
 
 @pytest.mark.asyncio
+@pytest.skip(PY36 is False)
 async def test_TestClient_Quart(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.get("/")
@@ -179,6 +184,7 @@ async def test_TestClient_Starlette(starlette_app):
 
 
 @pytest.mark.asyncio
+@pytest.skip(PY36 is False)
 async def test_set_cookie_in_request(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.post(
@@ -200,6 +206,7 @@ async def test_set_cookie_in_request(quart_app):
 
 
 @pytest.mark.asyncio
+@pytest.skip(PY36 is False)
 async def test_disable_cookies_in_client(quart_app):
     async with TestClient(quart_app, use_cookies=False) as client:
         resp = await client.post(
@@ -222,6 +229,7 @@ async def test_exception_starlette(starlette_app):
 
 
 @pytest.mark.asyncio
+@pytest.skip(PY36 is False)
 async def test_exception_quart(quart_app):
     @quart_app.route("/raiser")
     async def error():
@@ -234,6 +242,7 @@ async def test_exception_quart(quart_app):
 
 
 @pytest.mark.asyncio
+@pytest.skip(PY36 is False)
 async def test_quart_endpoint_not_responding(quart_app):
     async with TestClient(quart_app, timeout=0.1) as client:
         with pytest.raises(asyncio.TimeoutError):
@@ -344,6 +353,7 @@ async def test_response_stream_crashes(starlette_app):
 
 
 @pytest.mark.asyncio
+@pytest.skip(PY36 is False)
 async def test_follow_redirects(quart_app):
     async with TestClient(quart_app) as client:
         resp = await client.get("/redir?path=/")
