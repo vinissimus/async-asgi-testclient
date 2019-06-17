@@ -29,6 +29,7 @@ from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import is_last_one
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
+from async_asgi_testclient.websocket import WebSocketSession
 from functools import partial
 from http.cookies import SimpleCookie
 from json import dumps
@@ -90,6 +91,9 @@ class TestClient:
             pass
         elif message["type"] == f"lifespan.{action}.failed":
             raise Exception(message)
+
+    def websocket_connect(self, path, extra_headers=None):
+        return WebSocketSession(self.application, path, extra_headers)
 
     async def open(
         self,

@@ -64,4 +64,4 @@ async def test_quart_app():
  - [X] follow redirects
  - [X] response streams
  - [X] request streams
- - [ ] websocket support
+ - [X] websocket support

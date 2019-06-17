@@ -65,6 +65,7 @@ def quart_app():
 @pytest.fixture
 def starlette_app():
     from starlette.applications import Starlette
+    from starlette.endpoints import WebSocketEndpoint
     from starlette.responses import JSONResponse, Response
 
     app = Starlette()
@@ -72,6 +73,14 @@ def starlette_app():
     @app.on_event("startup")
     async def startup():
         app.custom_init_complete = True
+
+    @app.websocket_route("/ws")
+    class Echo(WebSocketEndpoint):
+
+        encoding = "text"
+
+        async def on_receive(self, websocket, data):
+            await websocket.send_text(f"Message text was: {data}")
 
     @app.route("/")
     async def homepage(request):
@@ -253,6 +262,15 @@ async def test_startlette_endpoint_not_responding(starlette_app):
     async with TestClient(starlette_app, timeout=0.1) as client:
         with pytest.raises(asyncio.TimeoutError):
             await client.get("/stuck")
+
+
+@pytest.mark.asyncio
+async def test_ws_endpoint(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_str("hi!")
+            msg = await ws.receive_text()
+            assert msg == "Message text was: hi!"
 
 
 @pytest.mark.asyncio

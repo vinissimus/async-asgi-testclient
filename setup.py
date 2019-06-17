@@ -3,7 +3,8 @@
 
 """The setup script."""
 
-from setuptools import setup, find_packages
+from setuptools import find_packages
+from setuptools import setup
 
 with open("README.md", "r") as f:
     readme = f.read()
@@ -37,6 +38,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/vinissimus/async-asgi-testclient",
-    version="0.2.2",
+    version="1.0.0",
     zip_safe=False,
 )
