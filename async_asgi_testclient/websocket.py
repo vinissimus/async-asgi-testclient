@@ -40,7 +40,9 @@ class WebSocketSession:
         if mode == "text":
             await self.send({"type": "websocket.receive", "text": text})
         else:
-            await self.send({"type": "websocket.receive", "bytes": text.encode("utf-8")})
+            await self.send(
+                {"type": "websocket.receive", "bytes": text.encode("utf-8")}
+            )
 
     async def receive(self):
         receive_or_fail = partial(receive, self.output_queue)
