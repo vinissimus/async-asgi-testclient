@@ -20,27 +20,27 @@ class WebSocketSession:
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        self.close()
+        await self.close()
 
-    def close(self, code: int = 1000):
-        self.send({"type": "websocket.disconnect", "code": code})
+    async def close(self, code: int = 1000):
+        await self.send({"type": "websocket.disconnect", "code": code})
 
-    def send(self, data):
+    async def send(self, data):
         self.input_queue.put_nowait(data)
 
-    def send_str(self, data: str) -> None:
-        self.send({"type": "websocket.receive", "text": data})
+    async def send_str(self, data: str) -> None:
+        await self.send({"type": "websocket.receive", "text": data})
 
-    def send_bytes(self, data: bytes) -> None:
-        self.send({"type": "websocket.receive", "bytes": data})
+    async def send_bytes(self, data: bytes) -> None:
+        await self.send({"type": "websocket.receive", "bytes": data})
 
-    def send_json(self, data, mode: str = "text") -> None:
+    async def send_json(self, data, mode: str = "text") -> None:
         assert mode in ["text", "binary"]
         text = json.dumps(data)
         if mode == "text":
-            self.send({"type": "websocket.receive", "text": text})
+            await self.send({"type": "websocket.receive", "text": text})
         else:
-            self.send({"type": "websocket.receive", "bytes": text.encode("utf-8")})
+            await self.send({"type": "websocket.receive", "bytes": text.encode("utf-8")})
 
     async def receive(self):
         receive_or_fail = partial(receive, self.output_queue)
@@ -94,7 +94,7 @@ class WebSocketSession:
             self.output_queue.put_nowait,
         )
 
-        self.send({"type": "websocket.connect"})
+        await self.send({"type": "websocket.connect"})
         msg = await self.receive()
         assert msg["type"] == "websocket.accept"
 
