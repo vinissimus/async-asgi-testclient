@@ -1,5 +1,5 @@
-from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import create_monitored_task
+from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
 from functools import partial
 
@@ -69,14 +69,15 @@ class WebSocketSession:
     async def __anext__(self):
         msg = await self.receive()
         if isinstance(msg, Message):
-            if msg.event == 'exit':
+            if msg.event == "exit":
                 raise StopAsyncIteration(msg)
         return msg
 
     async def connect(self):
         self.headers.update({"host": "localhost"})
         flat_headers = [
-            (bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in self.headers.items()
+            (bytes(k.lower(), "utf8"), bytes(v, "utf8"))
+            for k, v in self.headers.items()
         ]
         scope = {
             "type": "websocket",
@@ -90,7 +91,7 @@ class WebSocketSession:
 
         create_monitored_task(
             self.app(scope, self.input_queue.get, self.output_queue.put),
-            self.output_queue.put_nowait
+            self.output_queue.put_nowait,
         )
 
         self.send({"type": "websocket.connect"})
