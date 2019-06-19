@@ -1,6 +1,7 @@
 from functools import partial
 
 import asyncio
+import sys
 
 
 async def is_last_one(gen):
@@ -57,6 +58,13 @@ async def _send_after(timeout, queue, msg):
 
 
 def set_timeout(queue, timeout):
-    task = asyncio.Task.current_task()
-    msg = Message("err", asyncio.TimeoutError, task)
+    msg = Message("err", asyncio.TimeoutError, current_task())
     return asyncio.ensure_future(_send_after(timeout, queue, msg))
+
+
+def current_task():
+    PY37 = sys.version_info >= (3, 7)
+    if PY37:
+        return asyncio.current_task()
+    else:
+        return asyncio.Task.current_task()

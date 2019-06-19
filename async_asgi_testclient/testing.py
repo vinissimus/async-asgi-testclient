@@ -82,7 +82,7 @@ class TestClient:
 
     async def send_lifespan(self, action):
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
-        message = await receive(self._lifespan_output_queue)
+        message = await receive(self._lifespan_output_queue, timeout=self.timeout)
 
         if isinstance(message, Message):
             raise Exception(f"{message.event} - {message.reason} - {message.task}")
