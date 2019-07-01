@@ -244,9 +244,12 @@ class TestClient:
             response._content_consumed = True
 
         if cookie_jar is not None:
-            cookie_jar.load(response.headers.get("Set-Cookie", ""))
+            cookies = SimpleCookie()
+            for c in response.headers.getall("Set-Cookie", ""):
+                cookies.load(c)
             response.cookies = requests.cookies.RequestsCookieJar()
-            response.cookies.update(cookie_jar)
+            response.cookies.update(cookies)
+            cookie_jar.update(cookies)
 
         if allow_redirects and response.is_redirect:
             path = response.headers["location"]

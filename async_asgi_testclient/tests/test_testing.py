@@ -40,13 +40,21 @@ def quart_app():
             return "yes"
         return "no"
 
-    @app.route("/set_cookie", methods=["POST"])
+    @app.route("/set_cookies", methods=["POST"])
     async def set_cookie():
         r = Response("")
         r.set_cookie(key="my-cookie", value="1234")
+        r.set_cookie(key="my-cookie-2", value="5678")
         return r
 
-    @app.route("/cookie")
+    @app.route("/clear_cookie", methods=["POST"])
+    async def clear_cookie():
+        r = Response("")
+        r.delete_cookie(key="my-cookie")
+        r.delete_cookie(key="my-cookie-2")
+        return r
+
+    @app.route("/cookies")
     async def get_cookie():
         cookies = request.cookies
         return jsonify(cookies)
@@ -105,13 +113,21 @@ def starlette_app():
             return Response("yes")
         return Response("no")
 
-    @app.route("/set_cookie", methods=["POST"])
+    @app.route("/set_cookies", methods=["POST"])
     async def set_cookie(request):
         r = Response("")
         r.set_cookie("my-cookie", "1234")
+        r.set_cookie("my-cookie-2", "5678")
         return r
 
-    @app.route("/cookie")
+    @app.route("/clear_cookie", methods=["POST"])
+    async def clear_cookie(request):
+        r = Response("")
+        r.delete_cookie("my-cookie")
+        r.delete_cookie("my-cookie-2")
+        return r
+
+    @app.route("/cookies")
     async def get_cookie(request):
         cookies = request.cookies
         return JSONResponse(cookies)
@@ -147,15 +163,17 @@ async def test_TestClient_Quart(quart_app):
         assert resp.status_code == 200
         assert resp.text == "yes"
 
-        resp = await client.post(
-            "/set_cookie"
-        )  # responds with 'set-cookie: my-cookie=1234'
+        resp = await client.post("/set_cookies")
         assert resp.status_code == 200
-        assert resp.cookies == {"my-cookie": "1234"}
+        assert resp.cookies.get_dict() == {"my-cookie": "1234", "my-cookie-2": "5678"}
 
-        resp = await client.get("/cookie")
+        resp = await client.get("/cookies")
         assert resp.status_code == 200
-        assert resp.json() == {"my-cookie": "1234"}
+        assert resp.json() == {"my-cookie": "1234", "my-cookie-2": "5678"}
+
+        resp = await client.post("/clear_cookie")
+        assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
+        assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -181,36 +199,37 @@ async def test_TestClient_Starlette(starlette_app):
         assert resp.status_code == 200
         assert resp.text == "yes"
 
-        resp = await client.post(
-            "/set_cookie"
-        )  # responds with 'set-cookie: my-cookie=1234'
+        resp = await client.post("/set_cookies")
         assert resp.status_code == 200
+        assert resp.cookies.get_dict() == {"my-cookie": "1234", "my-cookie-2": "5678"}
 
-        resp = await client.get("/cookie")
+        resp = await client.get("/cookies")
         assert resp.status_code == 200
-        assert resp.json() == {"my-cookie": "1234"}
+        assert resp.json() == {"my-cookie": "1234", "my-cookie-2": "5678"}
+
+        resp = await client.post("/clear_cookie")
+        assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
+        assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
 @pytest.mark.skipif("PY37 != True")
 async def test_set_cookie_in_request(quart_app):
     async with TestClient(quart_app) as client:
-        resp = await client.post(
-            "/set_cookie"
-        )  # responds with 'set-cookie: my-cookie=1234'
+        resp = await client.post("/set_cookies")
         assert resp.status_code == 200
-        assert resp.cookies == {"my-cookie": "1234"}
+        assert resp.cookies.get_dict() == {"my-cookie": "1234", "my-cookie-2": "5678"}
 
         # Uses 'custom_cookie_jar' instead of 'client.cookie_jar'
         custom_cookie_jar = {"my-cookie": "6666"}
-        resp = await client.get("/cookie", cookies=custom_cookie_jar)
+        resp = await client.get("/cookies", cookies=custom_cookie_jar)
         assert resp.status_code == 200
         assert resp.json() == custom_cookie_jar
 
         # Uses 'client.cookie_jar' again
-        resp = await client.get("/cookie")
+        resp = await client.get("/cookies")
         assert resp.status_code == 200
-        assert resp.json() == {"my-cookie": "1234"}
+        assert resp.json() == {"my-cookie": "1234", "my-cookie-2": "5678"}
 
 
 @pytest.mark.asyncio
@@ -218,10 +237,10 @@ async def test_set_cookie_in_request(quart_app):
 async def test_disable_cookies_in_client(quart_app):
     async with TestClient(quart_app, use_cookies=False) as client:
         resp = await client.post(
-            "/set_cookie"
+            "/set_cookies"
         )  # responds with 'set-cookie: my-cookie=1234' but cookies are disabled
         assert resp.status_code == 200
-        assert resp.cookies == {}
+        assert resp.cookies.get_dict() == {}
 
 
 @pytest.mark.asyncio
