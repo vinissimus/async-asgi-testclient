@@ -1,7 +1,6 @@
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
-from functools import partial
 
 import asyncio
 import json
