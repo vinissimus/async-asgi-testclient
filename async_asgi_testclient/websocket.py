@@ -90,7 +90,7 @@ class WebSocketSession:
             "type": "websocket",
             "headers": flat_headers,
             "path": self.path,
-            "query_string": "",
+            "query_string": b"",
             "root_path": "",
             "scheme": "ws",
             "subprotocols": [],
