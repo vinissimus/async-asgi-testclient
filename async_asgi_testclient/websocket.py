@@ -1,7 +1,6 @@
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
-from functools import partial
 
 import asyncio
 import json
@@ -45,20 +44,26 @@ class WebSocketSession:
             )
 
     async def receive(self):
-        receive_or_fail = partial(receive, self.output_queue)
-        return await self.wait_response(receive_or_fail)
+        message = await receive(self.output_queue)
+        return message
 
     async def receive_text(self) -> str:
         message = await self.receive()
+        if message["type"] != "websocket.send":
+            raise Exception(message)
         return message["text"]
 
     async def receive_bytes(self) -> bytes:
         message = await self.receive()
+        if message["type"] != "websocket.send":
+            raise Exception(message)
         return message["bytes"]
 
     async def receive_json(self, mode: str = "text"):
         assert mode in ["text", "binary"]
         message = await self.receive()
+        if message["type"] != "websocket.send":
+            raise Exception(message)
         if mode == "text":
             text = message["text"]
         else:
@@ -85,7 +90,7 @@ class WebSocketSession:
             "type": "websocket",
             "headers": flat_headers,
             "path": self.path,
-            "query_string": "",
+            "query_string": b"",
             "root_path": "",
             "scheme": "ws",
             "subprotocols": [],
@@ -99,7 +104,3 @@ class WebSocketSession:
         await self.send({"type": "websocket.connect"})
         msg = await self.receive()
         assert msg["type"] == "websocket.accept"
-
-    async def wait_response(self, receive_or_fail):
-        message = await receive_or_fail()
-        return message
