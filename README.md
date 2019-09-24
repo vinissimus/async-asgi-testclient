@@ -1,6 +1,6 @@
 # async-asgi-testclient
 
-[![Build Status](https://travis-ci.com/vinissimus/async-asgi-testclient.svg?branch=master)](https://travis-ci.com/vinissimus/async-asgi-testclient) [![PyPI version](https://badge.fury.io/py/async-asgi-testclient.svg)](https://badge.fury.io/py/async-asgi-testclient) ![](https://img.shields.io/pypi/pyversions/async-asgi-testclient.svg)
+[![Build Status](https://travis-ci.com/vinissimus/async-asgi-testclient.svg?branch=master)](https://travis-ci.com/vinissimus/async-asgi-testclient) [![PyPI version](https://badge.fury.io/py/async-asgi-testclient.svg)](https://badge.fury.io/py/async-asgi-testclient) ![](https://img.shields.io/pypi/pyversions/async-asgi-testclient.svg) ![](https://img.shields.io/github/license/vinissimus/async-asgi-testclient)
 
 Async ASGI TestClient is a library for testing web applications that implements ASGI specification (version 2 and 3).
 
