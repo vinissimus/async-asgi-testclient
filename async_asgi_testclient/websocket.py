@@ -4,6 +4,7 @@ from async_asgi_testclient.utils import receive
 
 import asyncio
 import json
+from yarl import URL
 
 
 class WebSocketSession:
@@ -86,11 +87,14 @@ class WebSocketSession:
             (bytes(k.lower(), "utf8"), bytes(v, "utf8"))
             for k, v in self.headers.items()
         ]
+
+        url = URL(self.path)
+
         scope = {
             "type": "websocket",
             "headers": flat_headers,
-            "path": self.path,
-            "query_string": b"",
+            "path": url.path,
+            "query_string": url.query_string.encode('ascii'),
             "root_path": "",
             "scheme": "ws",
             "subprotocols": [],
