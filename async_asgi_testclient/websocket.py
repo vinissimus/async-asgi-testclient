@@ -1,10 +1,11 @@
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
+from urllib.parse import unquote
+from urllib.parse import urlsplit
 
 import asyncio
 import json
-from urllib.parse import unquote, urlsplit
 
 
 class WebSocketSession:
