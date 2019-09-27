@@ -1,6 +1,8 @@
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
+from urllib.parse import unquote
+from urllib.parse import urlsplit
 
 import asyncio
 import json
@@ -86,13 +88,16 @@ class WebSocketSession:
             (bytes(k.lower(), "utf8"), bytes(v, "utf8"))
             for k, v in self.headers.items()
         ]
+
+        scheme, netloc, path, query, fragment = urlsplit(self.path)
+
         scope = {
             "type": "websocket",
             "headers": flat_headers,
-            "path": self.path,
-            "query_string": b"",
+            "path": unquote(path),
+            "query_string": query.encode(),
             "root_path": "",
-            "scheme": "ws",
+            "scheme": scheme,
             "subprotocols": [],
         }
 
