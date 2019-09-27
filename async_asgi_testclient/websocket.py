@@ -4,7 +4,7 @@ from async_asgi_testclient.utils import receive
 
 import asyncio
 import json
-from yarl import URL
+from urllib.parse import unquote, urlsplit
 
 
 class WebSocketSession:
@@ -88,15 +88,15 @@ class WebSocketSession:
             for k, v in self.headers.items()
         ]
 
-        url = URL(self.path)
+        scheme, netloc, path, query, fragment = urlsplit(self.path)
 
         scope = {
             "type": "websocket",
             "headers": flat_headers,
-            "path": url.path,
-            "query_string": url.query_string.encode('ascii'),
+            "path": unquote(path),
+            "query_string": query.encode(),
             "root_path": "",
-            "scheme": "ws",
+            "scheme": scheme,
             "subprotocols": [],
         }
 
