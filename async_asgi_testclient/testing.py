@@ -55,6 +55,8 @@ class TestClient:
     the app for testing purposes.
     """
 
+    __test__ = False  # prevent pytest.PytestCollectionWarning
+
     def __init__(
         self, application, use_cookies: bool = True, timeout: Optional[int] = None
     ):
