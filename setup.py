@@ -38,6 +38,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/vinissimus/async-asgi-testclient",
-    version="1.1.1",
+    version="1.1.2",
     zip_safe=False,
 )
