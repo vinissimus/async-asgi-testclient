@@ -12,4 +12,6 @@ script:
   - isort -c -rc async_asgi_testclient
   - black --check async_asgi_testclient
   - flake8 async_asgi_testclient
-  - pytest --cov=async_asgi_testclient async_asgi_testclient -v
+  - pytest --cov=async_asgi_testclient async_asgi_testclient -v --cov-report
+after_success:
+  - codecov
