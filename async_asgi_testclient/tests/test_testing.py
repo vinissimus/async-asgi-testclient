@@ -183,16 +183,16 @@ async def test_TestClient_Quart(quart_app):
         assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
         assert resp.status_code == 200
 
-        client.headers = {'Authorization': 'mytoken'}
-        resp = await client.get('/echoheaders')
+        client.headers = {"Authorization": "mytoken"}
+        resp = await client.get("/echoheaders")
         assert resp.status_code == 200
-        assert resp.headers.get('authorization') == 'mytoken'
+        assert resp.headers.get("authorization") == "mytoken"
         # Reset client headers for next tests
         client.headers = {}
 
-        resp = await client.get('/echoheaders')
+        resp = await client.get("/echoheaders")
         assert resp.status_code == 200
-        assert 'Authorization' not in resp.headers
+        assert "Authorization" not in resp.headers
 
 
 @pytest.mark.asyncio
@@ -230,16 +230,16 @@ async def test_TestClient_Starlette(starlette_app):
         assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
         assert resp.status_code == 200
 
-        client.headers = {'Authorization': 'mytoken'}
-        resp = await client.get('/echoheaders')
+        client.headers = {"Authorization": "mytoken"}
+        resp = await client.get("/echoheaders")
         assert resp.status_code == 200
-        assert resp.headers.get('authorization') == 'mytoken'
+        assert resp.headers.get("authorization") == "mytoken"
         # Reset client headers for next tests
         client.headers = {}
 
-        resp = await client.get('/echoheaders')
+        resp = await client.get("/echoheaders")
         assert resp.status_code == 200
-        assert 'authorization' not in resp.headers
+        assert "authorization" not in resp.headers
 
 
 @pytest.mark.asyncio
