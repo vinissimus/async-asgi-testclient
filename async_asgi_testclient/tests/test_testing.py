@@ -184,9 +184,10 @@ async def test_TestClient_Quart(quart_app):
         assert resp.status_code == 200
 
         client.headers = {"Authorization": "mytoken"}
-        resp = await client.get("/echoheaders")
+        resp = await client.get("/echoheaders", headers={"this should be": "merged"})
         assert resp.status_code == 200
         assert resp.headers.get("authorization") == "mytoken"
+        assert resp.headers.get("this should be") == "merged"
         # Reset client headers for next tests
         client.headers = {}
 
@@ -231,9 +232,10 @@ async def test_TestClient_Starlette(starlette_app):
         assert resp.status_code == 200
 
         client.headers = {"Authorization": "mytoken"}
-        resp = await client.get("/echoheaders")
+        resp = await client.get("/echoheaders", headers={"this should be": "merged"})
         assert resp.status_code == 200
         assert resp.headers.get("authorization") == "mytoken"
+        assert resp.headers.get("this should be") == "merged"
         # Reset client headers for next tests
         client.headers = {}
 
