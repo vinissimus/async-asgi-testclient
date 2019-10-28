@@ -67,6 +67,10 @@ def quart_app():
     async def redir():
         return redirect(request.args["path"])
 
+    @app.route("/echoheaders")
+    async def echoheaders():
+        return "", 200, request.headers
+
     yield app
 
 
@@ -136,6 +140,10 @@ def starlette_app():
     async def stuck(request):
         await asyncio.sleep(60)
 
+    @app.route("/echoheaders")
+    async def echoheaders(request):
+        return Response(headers=request.headers)
+
     yield app
 
 
@@ -175,6 +183,18 @@ async def test_TestClient_Quart(quart_app):
         assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
         assert resp.status_code == 200
 
+        client.headers = {"Authorization": "mytoken"}
+        resp = await client.get("/echoheaders", headers={"this should be": "merged"})
+        assert resp.status_code == 200
+        assert resp.headers.get("authorization") == "mytoken"
+        assert resp.headers.get("this should be") == "merged"
+        # Reset client headers for next tests
+        client.headers = {}
+
+        resp = await client.get("/echoheaders")
+        assert resp.status_code == 200
+        assert "Authorization" not in resp.headers
+
 
 @pytest.mark.asyncio
 async def test_TestClient_Starlette(starlette_app):
@@ -210,6 +230,18 @@ async def test_TestClient_Starlette(starlette_app):
         resp = await client.post("/clear_cookie")
         assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
         assert resp.status_code == 200
+
+        client.headers = {"Authorization": "mytoken"}
+        resp = await client.get("/echoheaders", headers={"this should be": "merged"})
+        assert resp.status_code == 200
+        assert resp.headers.get("authorization") == "mytoken"
+        assert resp.headers.get("this should be") == "merged"
+        # Reset client headers for next tests
+        client.headers = {}
+
+        resp = await client.get("/echoheaders")
+        assert resp.status_code == 200
+        assert "authorization" not in resp.headers
 
 
 @pytest.mark.asyncio

@@ -58,13 +58,18 @@ class TestClient:
     __test__ = False  # prevent pytest.PytestCollectionWarning
 
     def __init__(
-        self, application, use_cookies: bool = True, timeout: Optional[int] = None
+        self,
+        application,
+        use_cookies: bool = True,
+        timeout: Optional[int] = None,
+        headers: Optional[Union[dict, CIMultiDict]] = None,
     ):
         self.application = guarantee_single_callable(application)
         self.cookie_jar = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.timeout = timeout
+        self.headers = headers or {}
 
     async def __aenter__(self):
         create_monitored_task(
@@ -158,8 +163,12 @@ class TestClient:
         input_queue: asyncio.Queue[dict] = asyncio.Queue()
         output_queue: asyncio.Queue[dict] = asyncio.Queue()
 
+        if not headers:
+            headers = {}
+        merged_headers = self.headers.copy()
+        merged_headers.update(headers)
         headers, path, query_string_bytes = make_test_headers_path_and_query_string(
-            self.application, path, headers, query_string
+            self.application, path, merged_headers, query_string
         )
 
         if [json is not sentinel, form is not None, data is not None].count(True) > 1:
