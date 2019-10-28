@@ -163,6 +163,8 @@ class TestClient:
         input_queue: asyncio.Queue[dict] = asyncio.Queue()
         output_queue: asyncio.Queue[dict] = asyncio.Queue()
 
+        if not headers:
+            headers = {}
         merged_headers = self.headers.copy()
         merged_headers.update(headers)
         headers, path, query_string_bytes = make_test_headers_path_and_query_string(
