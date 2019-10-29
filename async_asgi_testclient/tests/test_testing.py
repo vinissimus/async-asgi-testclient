@@ -5,6 +5,7 @@ import pytest
 import sys
 
 PY37 = sys.version_info >= (3, 7)
+PY38 = sys.version_info >= (3, 8)
 
 
 @pytest.fixture
@@ -197,6 +198,7 @@ async def test_TestClient_Quart(quart_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif("PY38 != True")
 async def test_TestClient_Starlette(starlette_app):
     async with TestClient(starlette_app) as client:
         resp = await client.get("/")
