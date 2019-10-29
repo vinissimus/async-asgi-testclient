@@ -1,5 +1,5 @@
 from async_asgi_testclient import TestClient
-from sys import version_info as PY_VER
+from sys import version_info as PY_VER  # noqa
 
 import asyncio
 import pytest
