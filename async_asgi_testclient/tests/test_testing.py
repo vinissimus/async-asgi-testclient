@@ -2,7 +2,7 @@ from async_asgi_testclient import TestClient
 
 import asyncio
 import pytest
-import sys
+import sys  # noqa
 
 
 @pytest.fixture
