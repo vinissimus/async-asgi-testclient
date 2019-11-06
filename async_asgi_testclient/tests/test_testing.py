@@ -195,7 +195,6 @@ async def test_TestClient_Quart(quart_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif("PY_VER >= (3,8)")
 async def test_TestClient_Starlette(starlette_app):
     async with TestClient(starlette_app) as client:
         resp = await client.get("/")
@@ -275,7 +274,6 @@ async def test_disable_cookies_in_client(quart_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif("PY_VER >= (3,8)")
 async def test_exception_starlette(starlette_app):
     async def view_raiser(request):
         assert 1 == 0
@@ -309,7 +307,6 @@ async def test_quart_endpoint_not_responding(quart_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif("PY_VER >= (3,8)")
 async def test_startlette_endpoint_not_responding(starlette_app):
     async with TestClient(starlette_app, timeout=0.1) as client:
         with pytest.raises(asyncio.TimeoutError):
@@ -317,7 +314,6 @@ async def test_startlette_endpoint_not_responding(starlette_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif("PY_VER >= (3,8)")
 async def test_ws_endpoint(starlette_app):
     async with TestClient(starlette_app, timeout=0.1) as client:
         async with client.websocket_connect("/ws") as ws:
@@ -327,7 +323,6 @@ async def test_ws_endpoint(starlette_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif("PY_VER >= (3,8)")
 async def test_request_stream(starlette_app):
     from starlette.responses import StreamingResponse
 
@@ -354,7 +349,6 @@ async def test_request_stream(starlette_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif("PY_VER >= (3,8)")
 async def test_upload_stream_from_download_stream(starlette_app):
     from starlette.responses import StreamingResponse
 
@@ -405,7 +399,6 @@ async def test_response_stream(quart_app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif("PY_VER >= (3,8)")
 async def test_response_stream_crashes(starlette_app):
     from starlette.responses import StreamingResponse
 
