@@ -1,3 +1,10 @@
+1.2.0
+-----
+ - Added Support for Python 3.8
+   [masipcat]
+ - Updated test dependencies
+   [masipcat]
+
 1.1.3
 -----
  - added default client headers
