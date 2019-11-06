@@ -1,6 +1,6 @@
 1.2.0
 -----
- - Added Support for Python 3.8
+ - Added support for Python 3.8
    [masipcat]
  - Updated test dependencies
    [masipcat]
