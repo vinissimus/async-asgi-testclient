@@ -1,3 +1,8 @@
+1.2.1
+-----
+ - Add client (remote peer) to scope
+   [aviramha]
+
 1.2.0
 -----
  - Added support for Python 3.8
