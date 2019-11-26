@@ -213,6 +213,7 @@ class TestClient:
             "query_string": query_string_bytes,
             "root_path": "",
             "headers": flat_headers,
+            "client": ["127.0.0.1", 50000],
         }
 
         create_monitored_task(
