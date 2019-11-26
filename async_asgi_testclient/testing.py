@@ -63,6 +63,7 @@ class TestClient:
         use_cookies: bool = True,
         timeout: Optional[int] = None,
         headers: Optional[Union[dict, CIMultiDict]] = None,
+        scope: Optional[dict] = None,
     ):
         self.application = guarantee_single_callable(application)
         self.cookie_jar = SimpleCookie() if use_cookies else None
@@ -70,6 +71,7 @@ class TestClient:
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.timeout = timeout
         self.headers = headers or {}
+        self._scope = scope or {}
 
     async def __aenter__(self):
         create_monitored_task(
@@ -214,6 +216,7 @@ class TestClient:
             "root_path": "",
             "headers": flat_headers,
         }
+        scope.update(self._scope)
 
         create_monitored_task(
             self.application(scope, input_queue.get, output_queue.put),
