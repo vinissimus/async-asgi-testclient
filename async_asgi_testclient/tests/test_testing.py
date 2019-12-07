@@ -69,6 +69,10 @@ def quart_app():
     async def echoheaders():
         return "", 200, request.headers
 
+    @app.route("/test_query")
+    async def test_query():
+        return Response(request.query_string)
+
     yield app
 
 
@@ -142,6 +146,10 @@ def starlette_app():
     async def echoheaders(request):
         return Response(headers=request.headers)
 
+    @app.route("/test_query")
+    async def test_query(request):
+        return Response(str(request.query_params))
+
     yield app
 
 
@@ -193,6 +201,14 @@ async def test_TestClient_Quart(quart_app):
         assert resp.status_code == 200
         assert "Authorization" not in resp.headers
 
+        resp = await client.get("/test_query", query_string={"a": 1, "b": "ç"})
+        assert resp.status_code == 200
+        assert resp.text == "a=1&b=%C3%A7"
+
+        resp = await client.get("/test_query?a=1&b=ç")
+        assert resp.status_code == 200
+        assert resp.text == "a=1&b=%C3%A7"
+
 
 @pytest.mark.asyncio
 async def test_TestClient_Starlette(starlette_app):
@@ -240,6 +256,14 @@ async def test_TestClient_Starlette(starlette_app):
         resp = await client.get("/echoheaders")
         assert resp.status_code == 200
         assert "authorization" not in resp.headers
+
+        resp = await client.get("/test_query", query_string={"a": 1, "b": "ç"})
+        assert resp.status_code == 200
+        assert resp.text == "a=1&b=%C3%A7"
+
+        resp = await client.get("/test_query?a=1&b=ç")
+        assert resp.status_code == 200
+        assert resp.text == "a=1&b=%C3%A7"
 
 
 @pytest.mark.asyncio

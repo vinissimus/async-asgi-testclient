@@ -1,3 +1,8 @@
+1.2.2
+-----
+ - Quote query_string by default
+   [masipcat]
+
 1.2.1
 -----
  - Add client (remote peer) to scope

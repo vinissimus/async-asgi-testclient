@@ -39,6 +39,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 from typing import Union
+from urllib.parse import quote
 from urllib.parse import urlencode
 
 import asyncio
@@ -351,6 +352,7 @@ def make_test_headers_path_and_query_string(
         raise ValueError("Query string is defined in the path and as an argument")
     if query_string is None:
         path, _, query_string_raw = path.partition("?")
+        query_string_raw = quote(query_string_raw, safe="&=")
     else:
         query_string_raw = urlencode(query_string, doseq=True)
     query_string_bytes = query_string_raw.encode("ascii")
