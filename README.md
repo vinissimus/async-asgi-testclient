@@ -63,6 +63,7 @@ async def test_quart_app():
 ## Supports
 
  - [X] cookies
+ - [X] multipart/form-data
  - [X] follow redirects
  - [X] response streams
  - [X] request streams

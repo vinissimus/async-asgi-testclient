@@ -2,6 +2,7 @@ from async_asgi_testclient import TestClient
 from sys import version_info as PY_VER  # noqa
 
 import asyncio
+import io
 import pytest
 
 
@@ -112,6 +113,27 @@ def starlette_app():
     async def form(request):
         form = await request.form()
         return JSONResponse(form._dict)
+
+    @app.route("/multipart", methods=["POST"])
+    async def multipart(request):
+        form = await request.form()
+        return JSONResponse(form._dict)
+
+    @app.route("/multipart_bin", methods=["POST"])
+    async def multipart_bin(request):
+        form = await request.form()
+        assert form["a"] == "\x00\x01\x02\x03\x04"
+
+        file_b = form["b"]
+        assert file_b.filename == "b.bin"
+        assert await file_b.read() == b"\x00\x01\x02\x03\x04"
+
+        file_c = form["c"]
+        assert file_c.filename == "c.txt"
+        assert file_c.content_type == "text/plain"
+        assert await file_c.read() == b"01234"
+
+        return Response(status_code=200)
 
     @app.route("/check_startup_works")
     async def check_startup_works(request):
@@ -228,6 +250,23 @@ async def test_TestClient_Starlette(starlette_app):
 
         resp = await client.post("/form", form=[("user", "root"), ("pswd", 1234)])
         assert resp.json() == {"pswd": "1234", "user": "root"}
+
+        file_like = io.StringIO("abcd")
+        resp = await client.post("/multipart", files={"a": "abcd", "b": (file_like,)})
+        assert resp.json() == {"a": "abcd", "b": "abcd"}
+
+        file_like_1 = io.BytesIO(bytes([0, 1, 2, 3, 4]))
+        file_like_2 = io.BytesIO(bytes([0, 1, 2, 3, 4]))
+        file_like_3 = io.BytesIO(bytes("01234", "ascii"))
+        resp = await client.post(
+            "/multipart_bin",
+            files={
+                "a": (file_like_1,),
+                "b": ("b.bin", file_like_2,),
+                "c": ("c.txt", file_like_3, "text/plain"),
+            },
+        )
+        assert resp.status_code == 200
 
         resp = await client.get("/check_startup_works")
         assert resp.status_code == 200

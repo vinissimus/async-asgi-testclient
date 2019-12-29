@@ -23,6 +23,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from async_asgi_testclient.compatibility import guarantee_single_callable
+from async_asgi_testclient.multipart import encode_multipart_formdata
 from async_asgi_testclient.response import BytesRW
 from async_asgi_testclient.response import Response
 from async_asgi_testclient.utils import create_monitored_task
@@ -67,12 +68,14 @@ class TestClient:
         scope: Optional[dict] = None,
     ):
         self.application = guarantee_single_callable(application)
-        self.cookie_jar = SimpleCookie() if use_cookies else None
-        self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
-        self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self.cookie_jar: Optional[
+            SimpleCookie
+        ] = SimpleCookie() if use_cookies else None
         self.timeout = timeout
         self.headers = headers or {}
         self._scope = scope or {}
+        self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
 
     async def __aenter__(self):
         create_monitored_task(
@@ -113,6 +116,7 @@ class TestClient:
         headers: Optional[Union[dict, CIMultiDict]] = None,
         data: Any = None,
         form: Optional[dict] = None,
+        files: Optional[dict] = None,
         query_string: Optional[dict] = None,
         json: Any = sentinel,
         scheme: str = "http",
@@ -139,6 +143,9 @@ class TestClient:
 
             form
                 Data to send form encoded in the request body.
+
+            files
+                Data to send as multipart in the request body.
 
             query_string
                 To send as a dictionary, alternatively the query_string can be
@@ -174,9 +181,14 @@ class TestClient:
             self.application, path, merged_headers, query_string
         )
 
-        if [json is not sentinel, form is not None, data is not None].count(True) > 1:
+        if [
+            json is not sentinel,
+            form is not None,
+            data is not None,
+            files is not None,
+        ].count(True) > 1:
             raise ValueError(
-                "Test args 'json', 'form', and 'data' are mutually exclusive"
+                "Test args 'json', 'form', 'files' and 'data' are mutually exclusive"
             )
 
         request_data = b""
@@ -193,6 +205,10 @@ class TestClient:
         if form is not None:
             request_data = urlencode(form).encode("utf-8")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+        if files is not None:
+            request_data, content_type = encode_multipart_formdata(files)
+            headers["Content-Type"] = content_type
 
         if cookies is None:  # use TestClient.cookie_jar
             cookie_jar = self.cookie_jar
