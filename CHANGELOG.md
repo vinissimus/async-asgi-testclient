@@ -1,3 +1,8 @@
+1.3.0
+-----
+ - Add support for multipart/form-data
+   [masipcat]
+
 1.2.2
 -----
  - Quote query_string by default
