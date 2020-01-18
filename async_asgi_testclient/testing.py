@@ -296,42 +296,42 @@ class TestClient:
             raise Exception(f"Excpected message type '{type_}'. " f"Found {message}")
         return message
 
-    async def delete(self, *args: Any, **kwargs: Any) -> bytes:
+    async def delete(self, *args: Any, **kwargs: Any) -> Response:
         """Make a DELETE request.
         """
         return await self.open(*args, method="DELETE", **kwargs)
 
-    async def get(self, *args: Any, **kwargs: Any) -> bytes:
+    async def get(self, *args: Any, **kwargs: Any) -> Response:
         """Make a GET request.
         """
         return await self.open(*args, method="GET", **kwargs)
 
-    async def head(self, *args: Any, **kwargs: Any) -> bytes:
+    async def head(self, *args: Any, **kwargs: Any) -> Response:
         """Make a HEAD request.
         """
         return await self.open(*args, method="HEAD", **kwargs)
 
-    async def options(self, *args: Any, **kwargs: Any) -> bytes:
+    async def options(self, *args: Any, **kwargs: Any) -> Response:
         """Make a OPTIONS request.
         """
         return await self.open(*args, method="OPTIONS", **kwargs)
 
-    async def patch(self, *args: Any, **kwargs: Any) -> bytes:
+    async def patch(self, *args: Any, **kwargs: Any) -> Response:
         """Make a PATCH request.
         """
         return await self.open(*args, method="PATCH", **kwargs)
 
-    async def post(self, *args: Any, **kwargs: Any) -> bytes:
+    async def post(self, *args: Any, **kwargs: Any) -> Response:
         """Make a POST request.
         """
         return await self.open(*args, method="POST", **kwargs)
 
-    async def put(self, *args: Any, **kwargs: Any) -> bytes:
+    async def put(self, *args: Any, **kwargs: Any) -> Response:
         """Make a PUT request.
         """
         return await self.open(*args, method="PUT", **kwargs)
 
-    async def trace(self, *args: Any, **kwargs: Any) -> bytes:
+    async def trace(self, *args: Any, **kwargs: Any) -> Response:
         """Make a TRACE request.
         """
         return await self.open(*args, method="TRACE", **kwargs)
