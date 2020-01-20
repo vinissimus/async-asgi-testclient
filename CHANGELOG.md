@@ -1,3 +1,12 @@
+1.4.0
+-----
+ - Added argument 'cookies' to `websocket_connect()`
+   [masipcat]
+ - Renamed `ws.send_str()` to `ws.send_text()`
+   [masipcat]
+ - Fix return type annotation of the methods invoking open()
+   [otsuka]
+
 1.3.0
 -----
  - Add support for multipart/form-data

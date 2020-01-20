@@ -1,7 +1,58 @@
 from functools import partial
+from multidict import CIMultiDict
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
+from urllib.parse import quote
+from urllib.parse import urlencode
 
 import asyncio
 import sys
+
+
+def flatten_headers(headers: Union[Dict, CIMultiDict]) -> List[Tuple]:
+    return [(bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
+
+
+def make_test_headers_path_and_query_string(
+    app: Any,
+    path: str,
+    headers: Optional[Union[dict, CIMultiDict]] = None,
+    query_string: Optional[dict] = None,
+) -> Tuple[CIMultiDict, str, bytes]:
+    """Make the headers and path with defaults for testing.
+
+    Arguments:
+        app: The application to test against.
+        path: The path to request. If the query_string argument is not
+            defined this argument will be partitioned on a '?' with
+            the following part being considered the query_string.
+        headers: Initial headers to send.
+        query_string: To send as a dictionary, alternatively the
+            query_string can be determined from the path.
+    """
+    if headers is None:
+        headers = CIMultiDict()
+    elif isinstance(headers, CIMultiDict):
+        headers = headers
+    elif headers is not None:
+        headers = CIMultiDict(headers)
+    headers.setdefault("Remote-Addr", "127.0.0.1")
+    headers.setdefault("User-Agent", "ASGI-Test-Client")
+    headers.setdefault("host", "localhost")
+
+    if "?" in path and query_string is not None:
+        raise ValueError("Query string is defined in the path and as an argument")
+    if query_string is None:
+        path, _, query_string_raw = path.partition("?")
+        query_string_raw = quote(query_string_raw, safe="&=")
+    else:
+        query_string_raw = urlencode(query_string, doseq=True)
+    query_string_bytes = query_string_raw.encode("ascii")
+    return headers, path, query_string_bytes
 
 
 async def is_last_one(gen):
