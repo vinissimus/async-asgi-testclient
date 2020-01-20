@@ -27,7 +27,9 @@ from async_asgi_testclient.multipart import encode_multipart_formdata
 from async_asgi_testclient.response import BytesRW
 from async_asgi_testclient.response import Response
 from async_asgi_testclient.utils import create_monitored_task
+from async_asgi_testclient.utils import flatten_headers
 from async_asgi_testclient.utils import is_last_one
+from async_asgi_testclient.utils import make_test_headers_path_and_query_string
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
 from async_asgi_testclient.websocket import WebSocketSession
@@ -36,11 +38,8 @@ from http.cookies import SimpleCookie
 from json import dumps
 from multidict import CIMultiDict
 from typing import Any
-from typing import List
 from typing import Optional
-from typing import Tuple
 from typing import Union
-from urllib.parse import quote
 from urllib.parse import urlencode
 
 import asyncio
@@ -105,8 +104,8 @@ class TestClient:
         elif message["type"] == f"lifespan.{action}.failed":
             raise Exception(message)
 
-    def websocket_connect(self, path, extra_headers=None):
-        return WebSocketSession(self.application, path, extra_headers)
+    def websocket_connect(self, path, headers=None, cookies=None):
+        return WebSocketSession(self, path, headers, cookies)
 
     async def open(
         self,
@@ -218,10 +217,6 @@ class TestClient:
         if cookie_jar and cookie_jar.output(header=""):
             headers.add("Cookie", cookie_jar.output(header=""))
 
-        flat_headers: List[Tuple] = [
-            (bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()
-        ]
-
         scope = {
             "type": "http",
             "http_version": "1.1",
@@ -231,7 +226,7 @@ class TestClient:
             "path": path,
             "query_string": query_string_bytes,
             "root_path": "",
-            "headers": flat_headers,
+            "headers": flatten_headers(headers),
         }
         scope.update(self._scope)
 
@@ -335,41 +330,3 @@ class TestClient:
         """Make a TRACE request.
         """
         return await self.open(*args, method="TRACE", **kwargs)
-
-
-def make_test_headers_path_and_query_string(
-    app: Any,
-    path: str,
-    headers: Optional[Union[dict, CIMultiDict]] = None,
-    query_string: Optional[dict] = None,
-) -> Tuple[CIMultiDict, str, bytes]:
-    """Make the headers and path with defaults for testing.
-
-    Arguments:
-        app: The application to test against.
-        path: The path to request. If the query_string argument is not
-            defined this argument will be partitioned on a '?' with
-            the following part being considered the query_string.
-        headers: Initial headers to send.
-        query_string: To send as a dictionary, alternatively the
-            query_string can be determined from the path.
-    """
-    if headers is None:
-        headers = CIMultiDict()
-    elif isinstance(headers, CIMultiDict):
-        headers = headers
-    elif headers is not None:
-        headers = CIMultiDict(headers)
-    headers.setdefault("Remote-Addr", "127.0.0.1")
-    headers.setdefault("User-Agent", "ASGI-Test-Client")
-    headers.setdefault("host", "localhost")
-
-    if "?" in path and query_string is not None:
-        raise ValueError("Query string is defined in the path and as an argument")
-    if query_string is None:
-        path, _, query_string_raw = path.partition("?")
-        query_string_raw = quote(query_string_raw, safe="&=")
-    else:
-        query_string_raw = urlencode(query_string, doseq=True)
-    query_string_bytes = query_string_raw.encode("ascii")
-    return headers, path, query_string_bytes

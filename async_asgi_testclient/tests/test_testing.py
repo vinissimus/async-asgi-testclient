@@ -1,4 +1,5 @@
 from async_asgi_testclient import TestClient
+from json import dumps
 from sys import version_info as PY_VER  # noqa
 
 import asyncio
@@ -95,7 +96,10 @@ def starlette_app():
         encoding = "text"
 
         async def on_receive(self, websocket, data):
-            await websocket.send_text(f"Message text was: {data}")
+            if data == "cookies":
+                await websocket.send_text(dumps(websocket.cookies))
+            else:
+                await websocket.send_text(f"Message text was: {data}")
 
     @app.route("/")
     async def homepage(request):
@@ -380,9 +384,18 @@ async def test_startlette_endpoint_not_responding(starlette_app):
 async def test_ws_endpoint(starlette_app):
     async with TestClient(starlette_app, timeout=0.1) as client:
         async with client.websocket_connect("/ws") as ws:
-            await ws.send_str("hi!")
+            await ws.send_text("hi!")
             msg = await ws.receive_text()
             assert msg == "Message text was: hi!"
+
+
+@pytest.mark.asyncio
+async def test_ws_endpoint_cookies(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws", cookies={"session": "abc"}) as ws:
+            await ws.send_text("cookies")
+            msg = await ws.receive_text()
+            assert msg == '{"session": "abc"}'
 
 
 @pytest.mark.asyncio
