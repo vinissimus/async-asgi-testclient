@@ -1,6 +1,6 @@
 1.4.1
 -----
- - Don't decode a bytes (binary file) to string to build multipart
+ - Don't decode bytes to string to build multipart
    [masipcat]
 
 1.4.0
