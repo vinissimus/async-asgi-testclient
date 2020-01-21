@@ -126,11 +126,11 @@ def starlette_app():
     @app.route("/multipart_bin", methods=["POST"])
     async def multipart_bin(request):
         form = await request.form()
-        assert form["a"] == "\x00\x01\x02\x03\x04"
+        assert form["a"] == "\x89\x01\x02\x03\x04"
 
         file_b = form["b"]
         assert file_b.filename == "b.bin"
-        assert await file_b.read() == b"\x00\x01\x02\x03\x04"
+        assert await file_b.read() == b"\x89\x01\x02\x03\x04"
 
         file_c = form["c"]
         assert file_c.filename == "c.txt"
@@ -259,8 +259,8 @@ async def test_TestClient_Starlette(starlette_app):
         resp = await client.post("/multipart", files={"a": "abcd", "b": (file_like,)})
         assert resp.json() == {"a": "abcd", "b": "abcd"}
 
-        file_like_1 = io.BytesIO(bytes([0, 1, 2, 3, 4]))
-        file_like_2 = io.BytesIO(bytes([0, 1, 2, 3, 4]))
+        file_like_1 = io.BytesIO(bytes([0x89, 1, 2, 3, 4]))
+        file_like_2 = io.BytesIO(bytes([0x89, 1, 2, 3, 4]))
         file_like_3 = io.BytesIO(bytes("01234", "ascii"))
         resp = await client.post(
             "/multipart_bin",

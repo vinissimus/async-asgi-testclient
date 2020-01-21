@@ -1,3 +1,8 @@
+1.4.1
+-----
+ - Don't decode bytes to string to build multipart
+   [masipcat]
+
 1.4.0
 -----
  - Added argument 'cookies' to `websocket_connect()`

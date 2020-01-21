@@ -12,20 +12,17 @@ def encode_multipart_formdata(
     # Based on https://julien.danjou.info/handling-multipart-form-data-python/
     boundary = binascii.hexlify(os.urandom(16)).decode("ascii")
 
-    body = (
-        "".join(
-            build_part(boundary, field_name, file_tuple)
-            for field_name, file_tuple in fields.items()
-        )
-        + f"--{boundary}--\r\n"
-    )
+    body = b"".join(
+        build_part(boundary, field_name, file_tuple)
+        for field_name, file_tuple in fields.items()
+    ) + bytes(f"--{boundary}--\r\n", "ascii")
 
     content_type = f"multipart/form-data; boundary={boundary}"
 
-    return body.encode("ascii"), content_type
+    return body, content_type
 
 
-def build_part(boundary: str, field_name: str, file_tuple: Union[str, Tuple]) -> str:
+def build_part(boundary: str, field_name: str, file_tuple: Union[str, Tuple]) -> bytes:
     """
     file_tuple:
         - 'string value'
@@ -33,12 +30,12 @@ def build_part(boundary: str, field_name: str, file_tuple: Union[str, Tuple]) ->
         - ('filename', fileobj)
         - ('filename', fileobj, 'content_type')
     """
-    value = ""
+    value = b""
     filename = ""
     content_type = ""
 
     if isinstance(file_tuple, str):
-        value = file_tuple
+        value = file_tuple.encode("ascii")
     else:
         if len(file_tuple) == 1:
             file_ = file_tuple[0]
@@ -48,6 +45,9 @@ def build_part(boundary: str, field_name: str, file_tuple: Union[str, Tuple]) ->
             filename, file_, content_type = file_tuple
         value = file_.read()
 
+        if isinstance(value, str):
+            value = value.encode("ascii")
+
     part = f'--{boundary}\r\nContent-Disposition: form-data; name="{field_name}"'
     if filename:
         part += f'; filename="{filename}"'
@@ -55,7 +55,4 @@ def build_part(boundary: str, field_name: str, file_tuple: Union[str, Tuple]) ->
     if content_type:
         part += f"\r\nContent-Type: {content_type}"
 
-    if isinstance(value, bytes):
-        value = value.decode("ascii")
-
-    return part + "\r\n\r\n" + value + "\r\n"
+    return part.encode("ascii") + b"\r\n\r\n" + value + b"\r\n"
