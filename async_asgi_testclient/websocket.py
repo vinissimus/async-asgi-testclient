@@ -22,7 +22,7 @@ class WebSocketSession:
         self.testclient = testclient
         self.path = path
         self.headers = headers or {}
-        self.cookies = cookies or {}
+        self.cookies = cookies
         self.input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.output_queue: asyncio.Queue[dict] = asyncio.Queue()
 
