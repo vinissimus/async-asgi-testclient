@@ -1,9 +1,9 @@
 from async_asgi_testclient import TestClient
+from http.cookies import SimpleCookie
 from json import dumps
 from sys import version_info as PY_VER  # noqa
 
 import asyncio
-from http.cookies import SimpleCookie
 import io
 import pytest
 
