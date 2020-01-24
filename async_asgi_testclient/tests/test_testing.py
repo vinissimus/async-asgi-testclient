@@ -1,4 +1,5 @@
 from async_asgi_testclient import TestClient
+from http.cookies import SimpleCookie
 from json import dumps
 from sys import version_info as PY_VER  # noqa
 
@@ -393,6 +394,17 @@ async def test_ws_endpoint(starlette_app):
 async def test_ws_endpoint_cookies(starlette_app):
     async with TestClient(starlette_app, timeout=0.1) as client:
         async with client.websocket_connect("/ws", cookies={"session": "abc"}) as ws:
+            await ws.send_text("cookies")
+            msg = await ws.receive_text()
+            assert msg == '{"session": "abc"}'
+
+
+@pytest.mark.asyncio
+async def test_ws_connect_inherits_test_client_cookies(starlette_app):
+    client = TestClient(starlette_app, use_cookies=True, timeout=0.1)
+    client.cookie_jar = SimpleCookie({"session": "abc"})
+    async with client:
+        async with client.websocket_connect("/ws") as ws:
             await ws.send_text("cookies")
             msg = await ws.receive_text()
             assert msg == '{"session": "abc"}'
