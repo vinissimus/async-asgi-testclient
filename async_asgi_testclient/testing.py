@@ -62,7 +62,7 @@ class TestClient:
         self,
         application,
         use_cookies: bool = True,
-        timeout: Optional[int] = None,
+        timeout: Optional[Union[int, float]] = None,
         headers: Optional[Union[dict, CIMultiDict]] = None,
         scope: Optional[dict] = None,
     ):

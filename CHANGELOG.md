@@ -1,3 +1,10 @@
+1.4.2
+-----
+ - Fixed mypy annotation
+   [masipcat]
+ - Remove default dict for self.cookies attr
+   [otsuka]
+
 1.4.1
 -----
  - Don't decode bytes to string to build multipart
