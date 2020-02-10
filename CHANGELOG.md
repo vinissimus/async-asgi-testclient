@@ -1,3 +1,8 @@
+1.4.3
+-----
+ - Send header Content-Length
+   [masipcat]
+
 1.4.2
 -----
  - Fixed mypy annotation
