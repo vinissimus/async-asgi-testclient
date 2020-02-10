@@ -209,6 +209,9 @@ class TestClient:
             request_data, content_type = encode_multipart_formdata(files)
             headers["Content-Type"] = content_type
 
+        if request_data and headers.get("Content-Length") is None:
+            headers["Content-Length"] = str(len(request_data))
+
         if cookies is None:  # use TestClient.cookie_jar
             cookie_jar = self.cookie_jar
         else:
