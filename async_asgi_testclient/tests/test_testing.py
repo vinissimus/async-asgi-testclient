@@ -395,8 +395,8 @@ async def test_ws_endpoint_cookies(starlette_app):
     async with TestClient(starlette_app, timeout=0.1) as client:
         async with client.websocket_connect("/ws", cookies={"session": "abc"}) as ws:
             await ws.send_text("cookies")
-            msg = await ws.receive_text()
-            assert msg == '{"session": "abc"}'
+            msg = await ws.receive_json()
+            assert msg == {"session": "abc"}
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,8 @@
+1.4.4
+-----
+ - Fix WebSocketSession.receive_json() doesn't support bytes
+   [masipcat]
+
 1.4.3
 -----
  - Send header Content-Length

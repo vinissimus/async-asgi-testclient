@@ -70,16 +70,17 @@ class WebSocketSession:
             raise Exception(message)
         return message["bytes"]
 
-    async def receive_json(self, mode: str = "text"):
-        assert mode in ["text", "binary"]
+    async def receive_json(self):
         message = await self._receive()
         if message["type"] != "websocket.send":
             raise Exception(message)
-        if mode == "text":
-            text = message["text"]
+        if "text" in message:
+            data = message["text"]
+        elif "bytes" in message:
+            data = message["bytes"]
         else:
-            text = message["bytes"].decode("utf-8")
-        return json.loads(text)
+            raise Exception(message)
+        return json.loads(data)
 
     async def _receive(self):
         return await receive(self.output_queue)
