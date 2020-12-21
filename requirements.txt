@@ -1,2 +1,2 @@
-multidict~=4.0
+multidict>=4.0,<=6.0
 requests~=2.21
