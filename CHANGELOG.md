@@ -1,3 +1,13 @@
+1.4.6
+-----
+ - Maintain hard references to tasks to prevent garbage collection
+   [MatthewScholefield]
+
+1.4.5
+-----
+ - Add support for Python 3.9
+   [kleschenko]
+
 1.4.4
 -----
  - Fix WebSocketSession.receive_json() doesn't support bytes
