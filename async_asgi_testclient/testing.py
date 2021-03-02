@@ -75,9 +75,10 @@ class TestClient:
         self._scope = scope or {}
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self._lifespan_task = None  # Must keep hard reference to prevent gc
 
     async def __aenter__(self):
-        create_monitored_task(
+        self._lifespan_task = create_monitored_task(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
                 self._lifespan_input_queue.get,
@@ -91,6 +92,7 @@ class TestClient:
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.send_lifespan("shutdown")
+        self._lifespan_task = None
 
     async def send_lifespan(self, action):
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
@@ -233,7 +235,7 @@ class TestClient:
         }
         scope.update(self._scope)
 
-        create_monitored_task(
+        running_task = create_monitored_task(
             self.application(scope, input_queue.get, output_queue.put),
             output_queue.put_nowait,
         )
@@ -279,6 +281,9 @@ class TestClient:
             response.cookies = requests.cookies.RequestsCookieJar()
             response.cookies.update(cookies)
             cookie_jar.update(cookies)
+
+        # We need to keep a hard reference to running task to prevent gc
+        assert running_task  # Useless assert to prevent unused variable warnings
 
         if allow_redirects and response.is_redirect:
             path = response.headers["location"]
