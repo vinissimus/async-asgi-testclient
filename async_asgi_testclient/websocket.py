@@ -25,6 +25,7 @@ class WebSocketSession:
         self.cookies = cookies
         self.input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.output_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self._app_task = None  # Necessary to keep a hard reference to running task
 
     async def __aenter__(self):
         await self.connect()
@@ -32,6 +33,7 @@ class WebSocketSession:
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.close()
+        self._app_task = None
 
     async def close(self, code: int = 1000):
         await self._send({"type": "websocket.disconnect", "code": code})
@@ -120,7 +122,7 @@ class WebSocketSession:
             "subprotocols": [],
         }
 
-        create_monitored_task(
+        self._app_task = create_monitored_task(
             app(scope, self.input_queue.get, self.output_queue.put),
             self.output_queue.put_nowait,
         )
