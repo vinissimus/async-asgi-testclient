@@ -1,3 +1,7 @@
+1.4.7
+-----
+ - Add support for Python 3.10
+
 1.4.6
 -----
  - Maintain hard references to tasks to prevent garbage collection
