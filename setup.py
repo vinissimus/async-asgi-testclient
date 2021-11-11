@@ -27,6 +27,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     description="Async client for testing ASGI web applications",
     install_requires=requirements,
@@ -40,6 +41,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/vinissimus/async-asgi-testclient",
-    version="1.4.6",
+    version="1.4.7",
     zip_safe=False,
 )
