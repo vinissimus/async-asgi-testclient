@@ -219,8 +219,12 @@ class TestClient:
         else:
             cookie_jar = SimpleCookie(cookies)
 
-        if cookie_jar and cookie_jar.output(header=""):
-            headers.add("Cookie", cookie_jar.output(header=""))
+        if cookie_jar:
+            cookie_data = []
+            for cookie_name, cookie in cookie_jar.items():
+                cookie_data.append(f'{cookie_name}={cookie.value}')
+            if cookie_data:
+                headers.add("Cookie", '; '.join(cookie_data))
 
         scope = {
             "type": "http",
