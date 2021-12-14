@@ -60,6 +60,10 @@ def quart_app():
         cookies = request.cookies
         return jsonify(cookies)
 
+    @app.route("/cookies-raw")
+    async def get_cookie_raw():
+        return Response(request.headers['Cookie'])
+
     @app.route("/stuck")
     async def stuck():
         await asyncio.sleep(60)
@@ -165,6 +169,10 @@ def starlette_app():
         cookies = request.cookies
         return JSONResponse(cookies)
 
+    @app.route("/cookies-raw")
+    async def get_cookie_raw(request):
+        return Response(request.headers['Cookie'])
+
     @app.route("/stuck")
     async def stuck(request):
         await asyncio.sleep(60)
@@ -211,6 +219,10 @@ async def test_TestClient_Quart(quart_app):
         resp = await client.get("/cookies")
         assert resp.status_code == 200
         assert resp.json() == {"my-cookie": "1234", "my-cookie-2": "5678"}
+
+        resp = await client.get("/cookies-raw")
+        assert resp.status_code == 200
+        assert resp.text == "my-cookie=1234; my-cookie-2=5678"
 
         resp = await client.post("/clear_cookie")
         assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
@@ -285,6 +297,10 @@ async def test_TestClient_Starlette(starlette_app):
         assert resp.status_code == 200
         assert resp.json() == {"my-cookie": "1234", "my-cookie-2": "5678"}
 
+        resp = await client.get("/cookies-raw")
+        assert resp.status_code == 200
+        assert resp.text == "my-cookie=1234; my-cookie-2=5678"
+
         resp = await client.post("/clear_cookie")
         assert resp.cookies.get_dict() == {"my-cookie": "", "my-cookie-2": ""}
         assert resp.status_code == 200
@@ -328,6 +344,10 @@ async def test_set_cookie_in_request(quart_app):
         resp = await client.get("/cookies")
         assert resp.status_code == 200
         assert resp.json() == {"my-cookie": "1234", "my-cookie-2": "5678"}
+
+        resp = await client.get("/cookies-raw")
+        assert resp.status_code == 200
+        assert resp.text == "my-cookie=1234; my-cookie-2=5678"
 
 
 @pytest.mark.asyncio
