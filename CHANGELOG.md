@@ -1,3 +1,8 @@
+1.4.8
+-----
+ - fix Cookie header rendering in requests
+   [druid8] [Paweł Pecio]
+
 1.4.7
 -----
  - Add support for Python 3.10

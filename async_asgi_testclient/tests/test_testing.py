@@ -62,7 +62,7 @@ def quart_app():
 
     @app.route("/cookies-raw")
     async def get_cookie_raw():
-        return Response(request.headers['Cookie'])
+        return Response(request.headers["Cookie"])
 
     @app.route("/stuck")
     async def stuck():
@@ -171,7 +171,7 @@ def starlette_app():
 
     @app.route("/cookies-raw")
     async def get_cookie_raw(request):
-        return Response(request.headers['Cookie'])
+        return Response(request.headers["Cookie"])
 
     @app.route("/stuck")
     async def stuck(request):
@@ -279,7 +279,7 @@ async def test_TestClient_Starlette(starlette_app):
             "/multipart_bin",
             files={
                 "a": (file_like_1,),
-                "b": ("b.bin", file_like_2,),
+                "b": ("b.bin", file_like_2),
                 "c": ("c.txt", file_like_3, "text/plain"),
             },
         )
