@@ -1,5 +1,6 @@
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import flatten_headers
+from async_asgi_testclient.utils import get_cookie_header_value
 from async_asgi_testclient.utils import make_test_headers_path_and_query_string
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
@@ -109,8 +110,10 @@ class WebSocketSession:
         else:
             cookie_jar = SimpleCookie(self.cookies)
 
-        if cookie_jar and cookie_jar.output(header=""):
-            headers.add("Cookie", cookie_jar.output(header=""))
+        if cookie_jar:
+            cookie_value = get_cookie_header_value(cookie_jar)
+            if cookie_value:
+                headers.add("Cookie", cookie_value)
 
         scope = {
             "type": "websocket",

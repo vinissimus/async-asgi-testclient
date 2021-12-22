@@ -28,6 +28,7 @@ from async_asgi_testclient.response import BytesRW
 from async_asgi_testclient.response import Response
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import flatten_headers
+from async_asgi_testclient.utils import get_cookie_header_value
 from async_asgi_testclient.utils import is_last_one
 from async_asgi_testclient.utils import make_test_headers_path_and_query_string
 from async_asgi_testclient.utils import Message
@@ -220,11 +221,9 @@ class TestClient:
             cookie_jar = SimpleCookie(cookies)
 
         if cookie_jar:
-            cookie_data = []
-            for cookie_name, cookie in cookie_jar.items():
-                cookie_data.append(f"{cookie_name}={cookie.value}")
-            if cookie_data:
-                headers.add("Cookie", "; ".join(cookie_data))
+            cookie_value = get_cookie_header_value(cookie_jar)
+            if cookie_value:
+                headers.add("Cookie", cookie_value)
 
         scope = {
             "type": "http",
