@@ -1,3 +1,8 @@
+1.4.9
+-----
+ - Fix websocket scope scheme
+   [yanyongyu]
+
 1.4.8
 -----
  - fix Cookie header rendering in requests
