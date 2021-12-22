@@ -118,7 +118,7 @@ class WebSocketSession:
             "path": path,
             "query_string": query_string_bytes,
             "root_path": "",
-            "scheme": "http",
+            "scheme": "ws",
             "subprotocols": [],
         }
 
