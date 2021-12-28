@@ -18,7 +18,7 @@ class WebSocketSession:
         path,
         headers: Optional[Dict] = None,
         cookies: Optional[Dict] = None,
-        scheme: str = "ws"
+        scheme: str = "ws",
     ):
         self.testclient = testclient
         self.path = path
