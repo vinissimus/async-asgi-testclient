@@ -106,8 +106,8 @@ class TestClient:
         elif message["type"] == f"lifespan.{action}.failed":
             raise Exception(message)
 
-    def websocket_connect(self, path, headers=None, cookies=None):
-        return WebSocketSession(self, path, headers, cookies)
+    def websocket_connect(self, *args: Any, **kwargs: Any) -> WebSocketSession:
+        return WebSocketSession(self, *args, **kwargs)
 
     async def open(
         self,

@@ -18,11 +18,13 @@ class WebSocketSession:
         path,
         headers: Optional[Dict] = None,
         cookies: Optional[Dict] = None,
+        scheme: str = "ws"
     ):
         self.testclient = testclient
         self.path = path
         self.headers = headers or {}
         self.cookies = cookies
+        self.scheme = scheme
         self.input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.output_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._app_task = None  # Necessary to keep a hard reference to running task
@@ -118,7 +120,7 @@ class WebSocketSession:
             "path": path,
             "query_string": query_string_bytes,
             "root_path": "",
-            "scheme": "ws",
+            "scheme": self.scheme,
             "subprotocols": [],
         }
 
