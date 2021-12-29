@@ -38,9 +38,6 @@ async def test_lifespan_spec_version_is_missing_or_correct(mock_app):
         assert resp.status_code == 200
 
 
-@pytest.mark.xfail(
-    raises=RuntimeError, reason="TestClient does not support ignoring lifespan messages"
-)
 @pytest.mark.asyncio
 async def test_lifespan_not_supported_is_allowed(mock_app):
     """
