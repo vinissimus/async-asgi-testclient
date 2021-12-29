@@ -15,9 +15,6 @@ from urllib.parse import quote
 import pytest
 
 
-@pytest.mark.xfail(
-    AssertionError, reason="Websocket scope is missing the mandatory asgi key"
-)
 @pytest.mark.asyncio
 async def test_asgi_version_is_present_in_websocket_scope(mock_app):
     """
@@ -41,7 +38,6 @@ async def test_asgi_version_is_present_in_websocket_scope(mock_app):
             await ws.close(code=1000)
 
 
-@pytest.mark.xfail(KeyError, reason="Websocket scope is missing the mandatory asgi key")
 @pytest.mark.asyncio
 async def test_websocket_spec_version_is_missing_or_correct(mock_app):
     """
