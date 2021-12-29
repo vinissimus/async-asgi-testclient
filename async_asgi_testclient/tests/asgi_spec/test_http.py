@@ -262,7 +262,6 @@ async def test_testclient_lowercases_header_names(mock_app):
         assert resp.status_code == 200
 
 
-@pytest.mark.xfail(reason="TestClient currently doesn't allow missing headers")
 @pytest.mark.asyncio
 async def test_response_headers_can_be_missing(mock_app):
     """
