@@ -111,7 +111,9 @@ class TestClient:
         message = await receive(self._lifespan_output_queue, timeout=self.timeout)
 
         if isinstance(message, Message):
-            raise TestClientError(f"{message.event} - {message.reason} - {message.task}", message=message)
+            raise TestClientError(
+                f"{message.event} - {message.reason} - {message.task}", message=message
+            )
 
         if message["type"] == f"lifespan.{action}.complete":
             pass
@@ -272,7 +274,10 @@ class TestClient:
         message = await self.wait_response(receive_or_fail, "http.response.start")
         response.status_code = message["status"]
         response.headers = CIMultiDict(
-            [(k.decode("utf8"), v.decode("utf8")) for k, v in message.get("headers", [])]
+            [
+                (k.decode("utf8"), v.decode("utf8"))
+                for k, v in message.get("headers", [])
+            ]
         )
 
         # Receive initial response body
