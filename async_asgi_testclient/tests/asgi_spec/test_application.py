@@ -135,36 +135,3 @@ async def test_scope_is_isolated_between_calls(mock_app):
         assert resp.status_code == 200
         resp = await client.get("/")
         assert resp.status_code == 200
-
-
-@pytest.mark.xfail(
-    raises=AssertionError, reason="Custom scopes can pollute between calls"
-)
-@pytest.mark.asyncio
-async def test_custom_scope_is_isolated_between_calls(mock_app):
-    """
-    When middleware is modifying the scope, it should make a copy of the scope object
-    before mutating it and passing it to the inner application, as changes may leak
-    upstream otherwise.
-    https://asgi.readthedocs.io/en/latest/specs/main.html#middleware
-
-    The spec doesn't explicitly state this in general, but it is implied in the
-    middleware section (and by common sense) that the scope dictionary should be
-    isolated within a call. So if we launch two http requests, one should not pollute
-    the other's scope dict.
-    """
-
-    async def handle_all(scope, receive, send):
-        # lifespan protocol currently ignores the custom scope :-(
-        if scope["type"] == "lifespan":
-            return
-        assert "persisted" not in scope["custom"]
-        scope["custom"]["persisted"] = "this value should not persist across calls"
-
-    mock_app.handle_all = handle_all
-
-    async with TestClient(mock_app, scope={"custom": {"key": "value"}}) as client:
-        resp = await client.get("/")
-        assert resp.status_code == 200
-        resp = await client.get("/")
-        assert resp.status_code == 200
