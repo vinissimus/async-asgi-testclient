@@ -328,7 +328,6 @@ async def test_response_status_must_be_int(mock_app):
             await client.get("/")
 
 
-@pytest.mark.xfail(reason="TestClient currently doesn't allow missing body key")
 @pytest.mark.asyncio
 async def test_response_body_can_be_missing(mock_app):
     """

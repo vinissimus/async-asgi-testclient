@@ -265,7 +265,7 @@ class TestClient:
 
         # Receive initial response body
         message = await self.wait_response(receive_or_fail, "http.response.body")
-        response.raw.write(message["body"])
+        response.raw.write(message.get("body", b""))
         response._more_body = message.get("more_body", False)
 
         # Consume the remaining response if not in stream
