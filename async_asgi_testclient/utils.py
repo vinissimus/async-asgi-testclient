@@ -17,6 +17,15 @@ def flatten_headers(headers: Union[Dict, CIMultiDict]) -> List[Tuple]:
     return [(bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
 
 
+def get_cookie_header_value(cookie_jar) -> Optional[str]:
+    cookie_data = []
+    for cookie_name, cookie in cookie_jar.items():
+        cookie_data.append(f"{cookie_name}={cookie.value}")
+    if cookie_data:
+        return "; ".join(cookie_data)
+    return None
+
+
 def make_test_headers_path_and_query_string(
     app: Any,
     path: str,

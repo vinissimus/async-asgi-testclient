@@ -1,3 +1,8 @@
+1.4.10
+------
+ - Fix cookie header rendering in WS requests
+   [masipcat]
+
 1.4.9
 -----
  - Fix websocket scope scheme
