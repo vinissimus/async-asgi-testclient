@@ -1,3 +1,8 @@
+1.4.10
+-----
+ - Bump an upper constraint for the multidict dependency
+   [kleschenko]
+
 1.4.9
 -----
  - Fix websocket scope scheme
