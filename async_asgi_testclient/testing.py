@@ -32,6 +32,7 @@ from async_asgi_testclient.utils import is_last_one
 from async_asgi_testclient.utils import make_test_headers_path_and_query_string
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
+from async_asgi_testclient.utils import to_relative_path
 from async_asgi_testclient.websocket import WebSocketSession
 from functools import partial
 from http.cookies import SimpleCookie
@@ -290,7 +291,7 @@ class TestClient:
         assert running_task  # Useless assert to prevent unused variable warnings
 
         if allow_redirects and response.is_redirect:
-            path = response.headers["location"]
+            path = to_relative_path(response.headers["location"])
             return await self.get(path)
         else:
             return response

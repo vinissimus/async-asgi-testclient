@@ -550,6 +550,14 @@ async def test_response_stream_crashes(starlette_app):
 
 
 @pytest.mark.asyncio
+async def test_absolute_redirect(starlette_app):
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/json/")  # trailing slash to force a redirect
+        assert resp.status_code == 200
+        assert resp.json() == {"hello": "world"}
+
+
+@pytest.mark.asyncio
 @pytest.mark.skipif("PY_VER < (3,7)")
 async def test_follow_redirects(quart_app):
     async with TestClient(quart_app) as client:
