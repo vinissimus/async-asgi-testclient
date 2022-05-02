@@ -116,9 +116,9 @@ def starlette_app():
     async def json(request):
         return JSONResponse({"hello": "world"})
 
-    @app.route('/json-redirect')
+    @app.route("/json-redirect")
     async def json_redirect(request):
-        return Response( status_code=302, headers={"Location": "http://localhost/json"})
+        return Response(status_code=302, headers={"Location": "http://localhost/json"})
 
     @app.route("/header")
     async def headers(request):
