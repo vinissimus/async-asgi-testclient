@@ -87,10 +87,7 @@ class WebSocketSession:
         return json.loads(data)
 
     async def _receive(self):
-        try:
-            return await receive(self.output_queue)
-        except:
-            pass
+        return await receive(self.output_queue)
 
     def __aiter__(self):
         return self
