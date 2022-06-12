@@ -1,3 +1,7 @@
+import ast
+
+import starlette.status
+
 from async_asgi_testclient import TestClient
 from http.cookies import SimpleCookie
 from json import dumps
@@ -107,6 +111,11 @@ def starlette_app():
                 await websocket.send_text(str(websocket.url))
             else:
                 await websocket.send_text(f"Message text was: {data}")
+
+    @app.websocket_route("/ws-reject")
+    async def websocket_reject(websocket):
+        # Send immediate close message to the client, using non default 100 code to test return of correct code
+        await websocket.close(starlette.status.WS_1003_UNSUPPORTED_DATA)
 
     @app.route("/")
     async def homepage(request):
@@ -448,6 +457,36 @@ async def test_ws_connect_custom_scheme(starlette_app):
             await ws.send_text("url")
             msg = await ws.receive_text()
             assert msg.startswith("wss://")
+
+
+@pytest.mark.asyncio
+async def test_ws_endpoint_with_immediate_rejection(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/ws-reject") as ws:
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1003_UNSUPPORTED_DATA
+        }
+
+
+@pytest.mark.asyncio
+async def test_invalid_ws_endpoint(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/invalid") as ws:
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1000_NORMAL_CLOSURE
+        }
 
 
 @pytest.mark.asyncio

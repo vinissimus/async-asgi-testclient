@@ -87,7 +87,10 @@ class WebSocketSession:
         return json.loads(data)
 
     async def _receive(self):
-        return await receive(self.output_queue)
+        try:
+            return await receive(self.output_queue)
+        except:
+            pass
 
     def __aiter__(self):
         return self
@@ -131,4 +134,5 @@ class WebSocketSession:
 
         await self._send({"type": "websocket.connect"})
         msg = await self._receive()
-        assert msg["type"] == "websocket.accept"
+        if msg["type"] != "websocket.accept":
+            raise Exception(msg)
