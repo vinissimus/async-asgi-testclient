@@ -1,6 +1,7 @@
 import ast
 
 import starlette.status
+from quart import websocket
 
 from async_asgi_testclient import TestClient
 from http.cookies import SimpleCookie
@@ -83,6 +84,20 @@ def quart_app():
     @app.route("/test_query")
     async def test_query():
         return Response(request.query_string)
+
+    @app.websocket("/ws")
+    async def websocket_endpoint():
+        data = await websocket.receive()
+        if data == "cookies":
+            await websocket.send(dumps(websocket.cookies))
+        elif data == "url":
+            await websocket.send(str(websocket.url))
+        else:
+            await websocket.send(f"Message text was: {data}")
+
+    @app.websocket("/ws-reject")
+    async def websocket_reject():
+        await websocket.close(code=starlette.status.WS_1003_UNSUPPORTED_DATA, reason="some reason")
 
     yield app
 
@@ -477,6 +492,89 @@ async def test_ws_endpoint_with_immediate_rejection(starlette_app):
 @pytest.mark.asyncio
 async def test_invalid_ws_endpoint(starlette_app):
     async with TestClient(starlette_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/invalid") as ws:
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1000_NORMAL_CLOSURE
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_endpoint(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_text("hi!")
+            msg = await ws.receive_text()
+            assert msg == "Message text was: hi!"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_endpoint_cookies(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws", cookies={"session": "abc"}) as ws:
+            await ws.send_text("cookies")
+            msg = await ws.receive_json()
+            assert msg == {"session": "abc"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_connect_inherits_test_client_cookies(quart_app):
+    client = TestClient(quart_app, use_cookies=True, timeout=0.1)
+    client.cookie_jar = SimpleCookie({"session": "abc"})
+    async with client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_text("cookies")
+            msg = await ws.receive_text()
+            assert msg == '{"session": "abc"}'
+
+
+@pytest.mark.asyncio
+async def test_quart_ws_connect_default_scheme(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_text("url")
+            msg = await ws.receive_text()
+            assert msg.startswith("ws://")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_connect_custom_scheme(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws", scheme="wss") as ws:
+            await ws.send_text("url")
+            msg = await ws.receive_text()
+            assert msg.startswith("wss://")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_endpoint_with_immediate_rejection(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/ws-reject") as ws:
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1003_UNSUPPORTED_DATA
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_invalid_ws_endpoint(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
         try:
             async with client.websocket_connect("/invalid") as ws:
                 pass
