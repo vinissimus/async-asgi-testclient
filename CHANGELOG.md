@@ -1,3 +1,8 @@
+1.4.11
+-----
+ - Added handling of absolute redirect paths 
+   [bentheiii]
+
 1.4.10
 -----
  - Bump an upper constraint for the multidict dependency
