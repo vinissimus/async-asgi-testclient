@@ -131,4 +131,5 @@ class WebSocketSession:
 
         await self._send({"type": "websocket.connect"})
         msg = await self._receive()
-        assert msg["type"] == "websocket.accept"
+        if msg["type"] != "websocket.accept":
+            raise Exception(msg)

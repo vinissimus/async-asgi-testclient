@@ -1,16 +1,20 @@
 from async_asgi_testclient import TestClient
 from http.cookies import SimpleCookie
 from json import dumps
+from starlette.responses import RedirectResponse
+from starlette.responses import StreamingResponse
 from sys import version_info as PY_VER  # noqa
 
+import ast
 import asyncio
 import io
 import pytest
+import starlette.status
 
 
 @pytest.fixture
 def quart_app():
-    from quart import Quart, jsonify, request, redirect, Response
+    from quart import Quart, jsonify, request, redirect, Response, websocket
 
     app = Quart(__name__)
 
@@ -80,6 +84,22 @@ def quart_app():
     async def test_query():
         return Response(request.query_string)
 
+    @app.websocket("/ws")
+    async def websocket_endpoint():
+        data = await websocket.receive()
+        if data == "cookies":
+            await websocket.send(dumps(websocket.cookies))
+        elif data == "url":
+            await websocket.send(str(websocket.url))
+        else:
+            await websocket.send(f"Message text was: {data}")
+
+    @app.websocket("/ws-reject")
+    async def websocket_reject():
+        await websocket.close(
+            code=starlette.status.WS_1003_UNSUPPORTED_DATA, reason="some reason"
+        )
+
     yield app
 
 
@@ -107,6 +127,11 @@ def starlette_app():
                 await websocket.send_text(str(websocket.url))
             else:
                 await websocket.send_text(f"Message text was: {data}")
+
+    @app.websocket_route("/ws-reject")
+    async def websocket_reject(websocket):
+        # Send immediate close message to the client, using non default 100 code to test return of correct code
+        await websocket.close(starlette.status.WS_1003_UNSUPPORTED_DATA)
 
     @app.route("/")
     async def homepage(request):
@@ -190,6 +215,10 @@ def starlette_app():
     @app.route("/test_query")
     async def test_query(request):
         return Response(str(request.query_params))
+
+    @app.route("/redir")
+    async def redir(request):
+        return RedirectResponse(request.query_params["path"], status_code=302)
 
     yield app
 
@@ -357,6 +386,29 @@ async def test_set_cookie_in_request(quart_app):
 
 
 @pytest.mark.asyncio
+async def test_set_cookie_in_request_starlette(starlette_app):
+    async with TestClient(starlette_app) as client:
+        resp = await client.post("/set_cookies")
+        assert resp.status_code == 200
+        assert resp.cookies.get_dict() == {"my-cookie": "1234", "my-cookie-2": "5678"}
+
+        # Uses 'custom_cookie_jar' instead of 'client.cookie_jar'
+        custom_cookie_jar = {"my-cookie": "6666"}
+        resp = await client.get("/cookies", cookies=custom_cookie_jar)
+        assert resp.status_code == 200
+        assert resp.json() == custom_cookie_jar
+
+        # Uses 'client.cookie_jar' again
+        resp = await client.get("/cookies")
+        assert resp.status_code == 200
+        assert resp.json() == {"my-cookie": "1234", "my-cookie-2": "5678"}
+
+        resp = await client.get("/cookies-raw")
+        assert resp.status_code == 200
+        assert resp.text == "my-cookie=1234; my-cookie-2=5678"
+
+
+@pytest.mark.asyncio
 @pytest.mark.skipif("PY_VER < (3,7)")
 async def test_disable_cookies_in_client(quart_app):
     async with TestClient(quart_app, use_cookies=False) as client:
@@ -455,6 +507,120 @@ async def test_ws_connect_custom_scheme(starlette_app):
 
 
 @pytest.mark.asyncio
+async def test_ws_endpoint_with_immediate_rejection(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/ws-reject"):
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1003_UNSUPPORTED_DATA,
+        }
+
+
+@pytest.mark.asyncio
+async def test_invalid_ws_endpoint(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/invalid"):
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1000_NORMAL_CLOSURE,
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_endpoint(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_text("hi!")
+            msg = await ws.receive_text()
+            assert msg == "Message text was: hi!"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_endpoint_cookies(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws", cookies={"session": "abc"}) as ws:
+            await ws.send_text("cookies")
+            msg = await ws.receive_json()
+            assert msg == {"session": "abc"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_connect_inherits_test_client_cookies(quart_app):
+    client = TestClient(quart_app, use_cookies=True, timeout=0.1)
+    client.cookie_jar = SimpleCookie({"session": "abc"})
+    async with client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_text("cookies")
+            msg = await ws.receive_text()
+            assert msg == '{"session": "abc"}'
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_connect_default_scheme(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_text("url")
+            msg = await ws.receive_text()
+            assert msg.startswith("ws://")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_connect_custom_scheme(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws", scheme="wss") as ws:
+            await ws.send_text("url")
+            msg = await ws.receive_text()
+            assert msg.startswith("wss://")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_ws_endpoint_with_immediate_rejection(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/ws-reject"):
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1003_UNSUPPORTED_DATA,
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("PY_VER < (3,7)")
+async def test_quart_invalid_ws_endpoint(quart_app):
+    async with TestClient(quart_app, timeout=0.1) as client:
+        try:
+            async with client.websocket_connect("/invalid"):
+                pass
+        except Exception as e:
+            thrown_exception = e
+
+        assert ast.literal_eval(str(thrown_exception)) == {
+            "type": "websocket.close",
+            "code": starlette.status.WS_1000_NORMAL_CLOSURE,
+        }
+
+
+@pytest.mark.asyncio
 async def test_request_stream(starlette_app):
     from starlette.responses import StreamingResponse
 
@@ -531,7 +697,24 @@ async def test_response_stream(quart_app):
 
 
 @pytest.mark.asyncio
-async def test_response_stream_crashes(starlette_app):
+async def test_response_stream_starlette(starlette_app):
+    @starlette_app.route("/download_stream")
+    async def down_stream(_):
+        async def async_generator():
+            chunk = b"X" * 1024
+            for _ in range(3):
+                yield chunk
+
+        return StreamingResponse(async_generator())
+
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/download_stream", stream=False)
+        assert resp.status_code == 200
+        assert len(resp.content) == 3 * 1024
+
+
+@pytest.mark.asyncio
+async def test_response_stream_crashes_starlette(starlette_app):
     from starlette.responses import StreamingResponse
 
     @starlette_app.route("/download_stream_crashes")
@@ -574,5 +757,20 @@ async def test_follow_redirects(quart_app):
 @pytest.mark.skipif("PY_VER < (3,7)")
 async def test_no_follow_redirects(quart_app):
     async with TestClient(quart_app) as client:
+        resp = await client.get("/redir?path=/", allow_redirects=False)
+        assert resp.status_code == 302
+
+
+@pytest.mark.asyncio
+async def test_follow_redirects_starlette(starlette_app):
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/redir?path=/")
+        assert resp.status_code == 200
+        assert resp.text == "full response"
+
+
+@pytest.mark.asyncio
+async def test_no_follow_redirects_starlette(starlette_app):
+    async with TestClient(starlette_app) as client:
         resp = await client.get("/redir?path=/", allow_redirects=False)
         assert resp.status_code == 302
