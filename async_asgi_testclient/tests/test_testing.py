@@ -116,6 +116,10 @@ def starlette_app():
     async def json(request):
         return JSONResponse({"hello": "world"})
 
+    @app.route("/json-redirect")
+    async def json_redirect(request):
+        return Response(status_code=302, headers={"Location": "http://localhost/json"})
+
     @app.route("/header")
     async def headers(request):
         return Response(status_code=204, headers={"X-Header": "Value"})
@@ -547,6 +551,14 @@ async def test_response_stream_crashes(starlette_app):
         with pytest.raises(Exception):
             async for _ in resp.iter_content(1024):
                 pass
+
+
+@pytest.mark.asyncio
+async def test_absolute_redirect(starlette_app):
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/json-redirect")
+        assert resp.status_code == 200
+        assert resp.json() == {"hello": "world"}
 
 
 @pytest.mark.asyncio
