@@ -459,11 +459,13 @@ async def test_request_stream(starlette_app):
     from starlette.responses import StreamingResponse
 
     async def up_stream(request):
-        async def gen():
-            async for chunk in request.stream():
+        chunks = [chunk async for chunk in request.stream()]
+
+        async def gen(chunks):
+            for chunk in chunks:
                 yield chunk
 
-        return StreamingResponse(gen())
+        return StreamingResponse(gen(chunks))
 
     starlette_app.add_route("/upload_stream", up_stream, methods=["POST"])
 
@@ -492,11 +494,13 @@ async def test_upload_stream_from_download_stream(starlette_app):
         return StreamingResponse(gen())
 
     async def up_stream(request):
-        async def gen():
-            async for chunk in request.stream():
+        chunks = [chunk async for chunk in request.stream()]
+
+        async def gen(chunks):
+            for chunk in chunks:
                 yield chunk
 
-        return StreamingResponse(gen())
+        return StreamingResponse(gen(chunks))
 
     starlette_app.add_route("/download_stream", down_stream, methods=["GET"])
     starlette_app.add_route("/upload_stream", up_stream, methods=["POST"])
