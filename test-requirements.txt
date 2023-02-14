@@ -1,5 +1,5 @@
 quart==0.17.0; python_version >= '3.7'
-starlette==0.12.13
+starlette==0.25.0
 python-multipart==0.0.5
 pytest==6.2.5
 pytest-asyncio==0.15.0
