@@ -131,4 +131,4 @@ class WebSocketSession:
 
         await self._send({"type": "websocket.connect"})
         msg = await self._receive()
-        assert msg["type"] == "websocket.accept"
+        assert msg["type"] == "websocket.accept", "websocket not accepted, possibly incorrect URL"
