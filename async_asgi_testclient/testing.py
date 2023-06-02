@@ -248,7 +248,7 @@ class TestClient:
             "type": "http",
             "http_version": "1.1",
             "asgi": {"version": "3.0"},
-            "method": method,
+            "method": method.upper(),
             "scheme": scheme,
             "path": path,
             "query_string": query_string_bytes,

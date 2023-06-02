@@ -80,9 +80,6 @@ async def test_http_version_is_1_1(mock_app):
         assert resp.status_code == 200
 
 
-@pytest.mark.xfail(
-    AssertionError, reason="TestClient does not uppercase scope['method']"
-)
 @pytest.mark.asyncio
 async def test_http_method_is_uppercased(mock_app):
     """
