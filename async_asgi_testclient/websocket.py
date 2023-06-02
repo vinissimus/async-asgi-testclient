@@ -115,6 +115,7 @@ class WebSocketSession:
             headers.add("Cookie", cookie_jar.output(header=""))
 
         scope = {
+            "asgi": {"version": "3.0"},
             "type": "websocket",
             "headers": flatten_headers(headers),
             "path": path,

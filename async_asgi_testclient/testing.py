@@ -23,6 +23,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from async_asgi_testclient.compatibility import guarantee_single_callable
+from async_asgi_testclient.exceptions import TestClientError
 from async_asgi_testclient.multipart import encode_multipart_formdata
 from async_asgi_testclient.response import BytesRW
 from async_asgi_testclient.response import Response
@@ -46,7 +47,9 @@ from urllib.parse import urlencode
 import asyncio
 import inspect
 import requests
+import logging
 
+logger = logging.getLogger(__name__)
 sentinel = object()
 
 
@@ -79,33 +82,47 @@ class TestClient:
         self._lifespan_task = None  # Must keep hard reference to prevent gc
 
     async def __aenter__(self):
-        self._lifespan_task = create_monitored_task(
-            self.application(
-                {"type": "lifespan", "asgi": {"version": "3.0"}},
-                self._lifespan_input_queue.get,
-                self._lifespan_output_queue.put,
-            ),
-            self._lifespan_output_queue.put_nowait,
-        )
+        try:
+            self._lifespan_task = create_monitored_task(
+                self.application(
+                    {"type": "lifespan", "asgi": {"version": "3.0"}},
+                    self._lifespan_input_queue.get,
+                    self._lifespan_output_queue.put,
+                ),
+                self._lifespan_output_queue.put_nowait,
+            )
+            # Make sure there is time for the output queue to be processed
+            await self.send_lifespan("startup")
+        except TestClientError:
+            # Pass these through directly, so that test clients can assert on them
+            raise
+        except:  # noqa
+            # Any other exception is (almost) definitely passed through from the app under test
+            # So it means the lifespan protocol is not supported.
+            logger.exception("Lifespan protocol raised an exception")
+            self._lifespan_task = None
 
-        await self.send_lifespan("startup")
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        await self.send_lifespan("shutdown")
-        self._lifespan_task = None
+        # If task is None, lifespan protocol is disabled (not supported by app)
+        if self._lifespan_task is not None:
+            await self.send_lifespan("shutdown")
+            self._lifespan_task = None
 
     async def send_lifespan(self, action):
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
         message = await receive(self._lifespan_output_queue, timeout=self.timeout)
 
         if isinstance(message, Message):
-            raise Exception(f"{message.event} - {message.reason} - {message.task}")
+            raise TestClientError(
+                f"{message.event} - {message.reason} - {message.task}", message=message
+            )
 
         if message["type"] == f"lifespan.{action}.complete":
             pass
         elif message["type"] == f"lifespan.{action}.failed":
-            raise Exception(message)
+            raise TestClientError(message, message=message)
 
     def websocket_connect(self, *args: Any, **kwargs: Any) -> WebSocketSession:
         return WebSocketSession(self, *args, **kwargs)
@@ -231,7 +248,7 @@ class TestClient:
             "type": "http",
             "http_version": "1.1",
             "asgi": {"version": "3.0"},
-            "method": method,
+            "method": method.upper(),
             "scheme": scheme,
             "path": path,
             "query_string": query_string_bytes,
@@ -261,12 +278,15 @@ class TestClient:
         message = await self.wait_response(receive_or_fail, "http.response.start")
         response.status_code = message["status"]
         response.headers = CIMultiDict(
-            [(k.decode("utf8"), v.decode("utf8")) for k, v in message["headers"]]
+            [
+                (k.decode("utf8"), v.decode("utf8"))
+                for k, v in message.get("headers", [])
+            ]
         )
 
         # Receive initial response body
         message = await self.wait_response(receive_or_fail, "http.response.body")
-        response.raw.write(message["body"])
+        response.raw.write(message.get("body", b""))
         response._more_body = message.get("more_body", False)
 
         # Consume the remaining response if not in stream
