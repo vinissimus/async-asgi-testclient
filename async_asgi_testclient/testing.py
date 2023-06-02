@@ -33,6 +33,7 @@ from async_asgi_testclient.utils import is_last_one
 from async_asgi_testclient.utils import make_test_headers_path_and_query_string
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
+from async_asgi_testclient.utils import to_relative_path
 from async_asgi_testclient.websocket import WebSocketSession
 from functools import partial
 from http.cookies import SimpleCookie
@@ -68,9 +69,9 @@ class TestClient:
         scope: Optional[dict] = None,
     ):
         self.application = guarantee_single_callable(application)
-        self.cookie_jar: Optional[
-            SimpleCookie
-        ] = SimpleCookie() if use_cookies else None
+        self.cookie_jar: Optional[SimpleCookie] = (
+            SimpleCookie() if use_cookies else None
+        )
         self.timeout = timeout
         self.headers = headers or {}
         self._scope = scope or {}
@@ -120,8 +121,8 @@ class TestClient:
         elif message["type"] == f"lifespan.{action}.failed":
             raise TestClientError(message, message=message)
 
-    def websocket_connect(self, path, headers=None, cookies=None):
-        return WebSocketSession(self, path, headers, cookies)
+    def websocket_connect(self, *args: Any, **kwargs: Any) -> WebSocketSession:
+        return WebSocketSession(self, *args, **kwargs)
 
     async def open(
         self,
@@ -307,7 +308,7 @@ class TestClient:
         assert running_task  # Useless assert to prevent unused variable warnings
 
         if allow_redirects and response.is_redirect:
-            path = response.headers["location"]
+            path = to_relative_path(response.headers["location"])
             return await self.get(path)
         else:
             return response
@@ -321,41 +322,33 @@ class TestClient:
         return message
 
     async def delete(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a DELETE request.
-        """
+        """Make a DELETE request."""
         return await self.open(*args, method="DELETE", **kwargs)
 
     async def get(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a GET request.
-        """
+        """Make a GET request."""
         return await self.open(*args, method="GET", **kwargs)
 
     async def head(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a HEAD request.
-        """
+        """Make a HEAD request."""
         return await self.open(*args, method="HEAD", **kwargs)
 
     async def options(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a OPTIONS request.
-        """
+        """Make a OPTIONS request."""
         return await self.open(*args, method="OPTIONS", **kwargs)
 
     async def patch(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a PATCH request.
-        """
+        """Make a PATCH request."""
         return await self.open(*args, method="PATCH", **kwargs)
 
     async def post(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a POST request.
-        """
+        """Make a POST request."""
         return await self.open(*args, method="POST", **kwargs)
 
     async def put(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a PUT request.
-        """
+        """Make a PUT request."""
         return await self.open(*args, method="PUT", **kwargs)
 
     async def trace(self, *args: Any, **kwargs: Any) -> Response:
-        """Make a TRACE request.
-        """
+        """Make a TRACE request."""
         return await self.open(*args, method="TRACE", **kwargs)

@@ -103,6 +103,8 @@ def starlette_app():
         async def on_receive(self, websocket, data):
             if data == "cookies":
                 await websocket.send_text(dumps(websocket.cookies))
+            elif data == "url":
+                await websocket.send_text(str(websocket.url))
             else:
                 await websocket.send_text(f"Message text was: {data}")
 
@@ -113,6 +115,10 @@ def starlette_app():
     @app.route("/json")
     async def json(request):
         return JSONResponse({"hello": "world"})
+
+    @app.route("/json-redirect")
+    async def json_redirect(request):
+        return Response(status_code=302, headers={"Location": "http://localhost/json"})
 
     @app.route("/header")
     async def headers(request):
@@ -431,6 +437,24 @@ async def test_ws_connect_inherits_test_client_cookies(starlette_app):
 
 
 @pytest.mark.asyncio
+async def test_ws_connect_default_scheme(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws") as ws:
+            await ws.send_text("url")
+            msg = await ws.receive_text()
+            assert msg.startswith("ws://")
+
+
+@pytest.mark.asyncio
+async def test_ws_connect_custom_scheme(starlette_app):
+    async with TestClient(starlette_app, timeout=0.1) as client:
+        async with client.websocket_connect("/ws", scheme="wss") as ws:
+            await ws.send_text("url")
+            msg = await ws.receive_text()
+            assert msg.startswith("wss://")
+
+
+@pytest.mark.asyncio
 async def test_request_stream(starlette_app):
     from starlette.responses import StreamingResponse
 
@@ -527,6 +551,14 @@ async def test_response_stream_crashes(starlette_app):
         with pytest.raises(Exception):
             async for _ in resp.iter_content(1024):
                 pass
+
+
+@pytest.mark.asyncio
+async def test_absolute_redirect(starlette_app):
+    async with TestClient(starlette_app) as client:
+        resp = await client.get("/json-redirect")
+        assert resp.status_code == 200
+        assert resp.json() == {"hello": "world"}
 
 
 @pytest.mark.asyncio

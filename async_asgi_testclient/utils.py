@@ -10,6 +10,7 @@ from urllib.parse import quote
 from urllib.parse import urlencode
 
 import asyncio
+import re
 import sys
 
 
@@ -53,6 +54,12 @@ def make_test_headers_path_and_query_string(
         query_string_raw = urlencode(query_string, doseq=True)
     query_string_bytes = query_string_raw.encode("ascii")
     return headers, path, query_string_bytes
+
+
+def to_relative_path(path: str):
+    if path.startswith("/"):
+        return path
+    return re.sub(r"^[a-zA-Z]+://[^/]+/", "/", path)
 
 
 async def is_last_one(gen):
