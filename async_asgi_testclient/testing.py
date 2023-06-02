@@ -47,7 +47,9 @@ from urllib.parse import urlencode
 import asyncio
 import inspect
 import requests
+import logging
 
+logger = logging.getLogger(__name__)
 sentinel = object()
 
 
@@ -97,6 +99,7 @@ class TestClient:
         except:  # noqa
             # Any other exception is (almost) definitely passed through from the app under test
             # So it means the lifespan protocol is not supported.
+            logger.exception("Lifespan protocol raised an exception")
             self._lifespan_task = None
 
         return self

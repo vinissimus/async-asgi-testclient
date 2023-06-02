@@ -7,6 +7,7 @@ These tests attempt to make sure that TestClient conforms to
 the ASGI specification documented at
 https://asgi.readthedocs.io/en/latest/specs/main.html
 """
+import logging
 
 from async_asgi_testclient import TestClient
 
@@ -52,6 +53,27 @@ async def test_lifespan_not_supported_is_allowed(mock_app):
     async with TestClient(mock_app) as client:
         resp = await client.get("/")
         assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_lifespan_not_supported_logs_the_exception(mock_app, caplog):
+    """
+    If an exception is raised when calling the application callable with a lifespan.startup
+    message or a scope with type lifespan, the server must continue but not send any lifespan
+    events.
+    https://asgi.readthedocs.io/en/latest/specs/lifespan.html#scope
+
+    Test that the exception raised is logged by the TestClient.
+    """
+
+    mock_app.use_lifespan = False
+
+    with caplog.at_level(level=logging.DEBUG, logger="async_asgi_testclient.testing"):
+        async with TestClient(mock_app) as client:
+            resp = await client.get("/")
+    records = [record for record in caplog.records if record.message == "Lifespan protocol raised an exception"]
+    assert len(records) == 1
+    assert str(records[0].exc_info[1]) == "Type 'lifespan' is not supported."
 
 
 @pytest.mark.asyncio
