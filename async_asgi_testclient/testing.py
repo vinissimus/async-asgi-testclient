@@ -1,5 +1,4 @@
-"""
-Copyright P G Jones 2017.
+"""Copyright P G Jones 2017.
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
@@ -22,30 +21,31 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-from async_asgi_testclient.compatibility import guarantee_single_callable
-from async_asgi_testclient.multipart import encode_multipart_formdata
-from async_asgi_testclient.response import BytesRW
-from async_asgi_testclient.response import Response
-from async_asgi_testclient.utils import create_monitored_task
-from async_asgi_testclient.utils import flatten_headers
-from async_asgi_testclient.utils import is_last_one
-from async_asgi_testclient.utils import make_test_headers_path_and_query_string
-from async_asgi_testclient.utils import Message
-from async_asgi_testclient.utils import receive
-from async_asgi_testclient.utils import to_relative_path
-from async_asgi_testclient.websocket import WebSocketSession
+import asyncio
+import inspect
 from functools import partial
 from http.cookies import SimpleCookie
 from json import dumps
-from multidict import CIMultiDict
-from typing import Any
-from typing import Optional
-from typing import Union
+from typing import Any, Optional, Union
 from urllib.parse import urlencode
 
-import asyncio
-import inspect
 import requests
+from multidict import CIMultiDict
+
+from async_asgi_testclient.compatibility import guarantee_single_callable
+from async_asgi_testclient.multipart import encode_multipart_formdata
+from async_asgi_testclient.response import BytesRW, Response
+from async_asgi_testclient.utils import (
+    Message,
+    create_monitored_task,
+    flatten_headers,
+    get_cookie_header_value,
+    is_last_one,
+    make_test_headers_path_and_query_string,
+    receive,
+    to_relative_path,
+)
+from async_asgi_testclient.websocket import WebSocketSession
 
 sentinel = object()
 
@@ -110,7 +110,7 @@ class TestClient:
     def websocket_connect(self, *args: Any, **kwargs: Any) -> WebSocketSession:
         return WebSocketSession(self, *args, **kwargs)
 
-    async def open(
+    async def open(  # noqa: C901
         self,
         path: str,
         *,
@@ -221,11 +221,9 @@ class TestClient:
             cookie_jar = SimpleCookie(cookies)
 
         if cookie_jar:
-            cookie_data = []
-            for cookie_name, cookie in cookie_jar.items():
-                cookie_data.append(f"{cookie_name}={cookie.value}")
-            if cookie_data:
-                headers.add("Cookie", "; ".join(cookie_data))
+            cookie_value = get_cookie_header_value(cookie_jar)
+            if cookie_value:
+                headers.add("Cookie", cookie_value)
 
         scope = {
             "type": "http",

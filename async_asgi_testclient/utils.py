@@ -1,21 +1,24 @@
-from functools import partial
-from multidict import CIMultiDict
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
-from urllib.parse import quote
-from urllib.parse import urlencode
-
 import asyncio
 import re
 import sys
+from functools import partial
+from typing import Any, Dict, List, Optional, Tuple, Union
+from urllib.parse import quote, urlencode
+
+from multidict import CIMultiDict
 
 
 def flatten_headers(headers: Union[Dict, CIMultiDict]) -> List[Tuple]:
     return [(bytes(k.lower(), "utf8"), bytes(v, "utf8")) for k, v in headers.items()]
+
+
+def get_cookie_header_value(cookie_jar) -> Optional[str]:
+    cookie_data = []
+    for cookie_name, cookie in cookie_jar.items():
+        cookie_data.append(f"{cookie_name}={cookie.value}")
+    if cookie_data:
+        return "; ".join(cookie_data)
+    return None
 
 
 def make_test_headers_path_and_query_string(

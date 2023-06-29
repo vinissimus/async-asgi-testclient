@@ -58,7 +58,6 @@ exclude_lines = [
 select = [
     "B",  # flake8-bugbear
     "C",  # flake8-comprehensions
-    "D",  # documentation
     "E",  # pycodestyle errors
     "F",  # pyflakes
     "I",  # isort

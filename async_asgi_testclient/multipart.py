@@ -1,9 +1,6 @@
-from typing import Dict
-from typing import Tuple
-from typing import Union
-
 import binascii
 import os
+from typing import Dict, Tuple, Union
 
 
 def encode_multipart_formdata(
@@ -23,12 +20,11 @@ def encode_multipart_formdata(
 
 
 def build_part(boundary: str, field_name: str, file_tuple: Union[str, Tuple]) -> bytes:
-    """
-    file_tuple:
-        - 'string value'
-        - (fileobj,)
-        - ('filename', fileobj)
-        - ('filename', fileobj, 'content_type')
+    """file_tuple:
+    - 'string value'
+    - (fileobj,)
+    - ('filename', fileobj)
+    - ('filename', fileobj, 'content_type').
     """
     value = b""
     filename = ""

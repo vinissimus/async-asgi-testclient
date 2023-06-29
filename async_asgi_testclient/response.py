@@ -1,9 +1,8 @@
+import io
+
 from requests.exceptions import StreamConsumedError
 from requests.models import Response as _Response
-from requests.utils import iter_slices
-from requests.utils import stream_decode_response_unicode
-
-import io
+from requests.utils import iter_slices, stream_decode_response_unicode
 
 
 class BytesRW(object):

@@ -1,14 +1,16 @@
-from async_asgi_testclient.utils import create_monitored_task
-from async_asgi_testclient.utils import flatten_headers
-from async_asgi_testclient.utils import make_test_headers_path_and_query_string
-from async_asgi_testclient.utils import Message
-from async_asgi_testclient.utils import receive
-from http.cookies import SimpleCookie
-from typing import Dict
-from typing import Optional
-
 import asyncio
 import json
+from http.cookies import SimpleCookie
+from typing import Dict, Optional
+
+from async_asgi_testclient.utils import (
+    Message,
+    create_monitored_task,
+    flatten_headers,
+    get_cookie_header_value,
+    make_test_headers_path_and_query_string,
+    receive,
+)
 
 
 class WebSocketSession:
@@ -111,8 +113,10 @@ class WebSocketSession:
         else:
             cookie_jar = SimpleCookie(self.cookies)
 
-        if cookie_jar and cookie_jar.output(header=""):
-            headers.add("Cookie", cookie_jar.output(header=""))
+        if cookie_jar:
+            cookie_value = get_cookie_header_value(cookie_jar)
+            if cookie_value:
+                headers.add("Cookie", cookie_value)
 
         scope = {
             "type": "websocket",
@@ -131,4 +135,5 @@ class WebSocketSession:
 
         await self._send({"type": "websocket.connect"})
         msg = await self._receive()
-        assert msg["type"] == "websocket.accept"
+        if msg["type"] != "websocket.accept":
+            raise Exception(msg)
