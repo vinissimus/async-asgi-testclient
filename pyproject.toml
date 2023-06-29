@@ -1,0 +1,92 @@
+[project]
+name = "async-asgi-testclient"
+description = "async-asgi-testclient serve to test"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { file = "LICENSE" }
+authors = []
+classifiers = [
+    "Operating System :: OS Independent",
+    "Topic :: Software Development",
+    "Typing :: Typed",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dynamic = ["version"]
+
+[tool.black]
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+strict = false
+exclude = "venv"
+ignore_missing_imports = true
+disallow_untyped_defs = true
+install_types = true
+non_interactive = true
+
+[tool.pytest.ini_options]
+testpaths = [
+    "async_asgi_testclient/tests/",
+]
+asyncio_mode = "auto"
+addopts = "-vv --cov=async_asgi_testclient --capture=no"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+parallel = true
+source = [
+    "async_asgi_testclient",
+]
+context = '${CONTEXT}'
+omit = []
+
+[tool.coverage.report]
+exclude_lines = [
+    # re-enable the standard pragma
+    "pragma: no cover",
+    # don't complain if tests don't hit defensive assertion code:
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+select = [
+    "B",  # flake8-bugbear
+    "C",  # flake8-comprehensions
+    "D",  # documentation
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "I",  # isort
+    "S",  # bandit
+    "W",  # pycodestyle warnings
+]
+ignore = [
+    # disable missing docstring in public module
+    "D100",
+    # disable missing docstring in public method as we don't want
+    # to comment these methods and expose them to the documentation
+    "D102",
+    # disable missing docstring in public package
+    "D104",
+    # Disable missing docstring in __init__
+    "D107",
+    # line too long, handled by black
+    "E501",
+    # do not perform function calls in argument defaults
+    "B008",
+    # Disable bandit check of "assert" in code as they are used to fix
+    # mypy detection in some case
+    "S101",
+]
+line-length = 88
+
+[tool.ruff.per-file-ignores]
+"async_asgi_testclient/tests/**" = ["D", "S"]
+
+[tool.ruff.pydocstyle]
+convention = "google"

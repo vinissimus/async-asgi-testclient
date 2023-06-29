@@ -1,5 +1,4 @@
-"""
-Copyright (c) Django Software Foundation and individual contributors.
+"""Copyright (c) Django Software Foundation and individual contributors.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
@@ -32,9 +31,7 @@ import inspect
 
 
 def is_double_callable(application):
-    """
-    Tests to see if an application is a legacy-style (double-callable) application.
-    """
+    """Tests to see if an application is a legacy-style (double-callable) application."""
     # Look for a hint on the object first
     if getattr(application, "_asgi_single_callable", False):
         return False
@@ -54,9 +51,7 @@ def is_double_callable(application):
 
 
 def double_to_single_callable(application):
-    """
-    Transforms a double-callable ASGI application into a single-callable one.
-    """
+    """Transforms a double-callable ASGI application into a single-callable one."""
 
     async def new_application(scope, receive, send):
         instance = application(scope)
@@ -66,8 +61,7 @@ def double_to_single_callable(application):
 
 
 def guarantee_single_callable(application):
-    """
-    Takes either a single- or double-callable application and always returns it
+    """Takes either a single- or double-callable application and always returns it
     in single-callable style. Use this to add backwards compatibility for ASGI
     2.0 applications to your server/test harness/etc.
     """

@@ -40,7 +40,7 @@ setup(
     packages=find_packages(include=["async_asgi_testclient"]),
     test_suite="tests",
     tests_require=test_requirements,
-    url="https://github.com/vinissimus/async-asgi-testclient",
+    url="https://github.com/numberly/async-asgi-testclient",
     version="1.4.11",
     zip_safe=False,
 )
